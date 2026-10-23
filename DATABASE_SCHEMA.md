@@ -1272,10 +1272,11 @@ ORDER BY fecha DESC;
 
 
 -- ================================================================
--- BLOQUE 15 — FUNCIÓN PARA PROYECCIÓN DE CASH FLOW
+-- BLOQUE 15 — FUNCIÓN PARA PROYECCIÓN DE FLUJO DE CAJA
 --
--- Calcula flujo histórico de los últimos 30 días y una proyección
--- simple basada en promedios diarios.
+-- Devuelve 30 días calendario de histórico y una proyección basada en
+-- promedios diarios que incluyen los días sin movimientos. El saldo histórico
+-- se reconstruye al cierre de cada día para cajas que siguen abiertas hoy.
 -- ================================================================
 
 CREATE OR REPLACE FUNCTION public.fn_flujo_caja_proyectado(dias_adelante INT DEFAULT 30)
@@ -1286,78 +1287,96 @@ RETURNS TABLE (
     egresos NUMERIC,
     saldo_neto NUMERIC,
     saldo_acumulado NUMERIC
-) AS $$
+) LANGUAGE plpgsql AS $$
 DECLARE
     v_saldo_actual NUMERIC;
     v_fecha_inicio DATE;
     v_promedio_ingresos_diarios NUMERIC;
     v_promedio_egresos_diarios NUMERIC;
 BEGIN
-    v_fecha_inicio := CURRENT_DATE - INTERVAL '30 days';
+    v_fecha_inicio := CURRENT_DATE - 29;
 
-    SELECT COALESCE(SUM(c.monto_inicial), 0)
-         + COALESCE(SUM(CASE WHEN tmc.afecta_saldo = 'INGRESO' THEN mc.monto ELSE 0 END), 0)
-         - COALESCE(SUM(CASE WHEN tmc.afecta_saldo = 'EGRESO' THEN mc.monto ELSE 0 END), 0)
-    INTO v_saldo_actual
-    FROM public.cajas c
-    LEFT JOIN public.movimientos_caja mc ON c.id = mc.caja_id
-    LEFT JOIN public.catalogo_tipos_movimiento_caja tmc ON mc.tipo = tmc.codigo
-    WHERE c.estado = 'ABIERTA';
+    IF dias_adelante IS NOT NULL AND dias_adelante < 0 THEN
+        RAISE EXCEPTION 'dias_adelante no puede ser negativo';
+    END IF;
 
-    SELECT
-        COALESCE(AVG(ingresos_dia), 0),
-        COALESCE(AVG(egresos_dia), 0)
-    INTO v_promedio_ingresos_diarios, v_promedio_egresos_diarios
-    FROM (
-        SELECT
-            DATE(mc.fecha) AS fecha_dia,
-            SUM(CASE WHEN tmc.afecta_saldo = 'INGRESO' THEN mc.monto ELSE 0 END) AS ingresos_dia,
-            SUM(CASE WHEN tmc.afecta_saldo = 'EGRESO' THEN mc.monto ELSE 0 END) AS egresos_dia
-        FROM public.movimientos_caja mc
-        JOIN public.catalogo_tipos_movimiento_caja tmc ON mc.tipo = tmc.codigo
-        WHERE mc.fecha >= v_fecha_inicio
-        GROUP BY DATE(mc.fecha)
-    ) t;
+    -- Agregar movimientos por caja antes del JOIN evita duplicar monto_inicial.
+    SELECT COALESCE(SUM(c.monto_inicial + COALESCE(m.saldo_movimientos, 0)), 0)
+      INTO v_saldo_actual
+      FROM public.cajas c
+      LEFT JOIN (
+          SELECT mc.caja_id,
+                 SUM(CASE WHEN tmc.afecta_saldo = 'INGRESO' THEN mc.monto
+                          WHEN tmc.afecta_saldo = 'EGRESO' THEN -mc.monto
+                          ELSE 0 END) AS saldo_movimientos
+            FROM public.movimientos_caja mc
+            JOIN public.catalogo_tipos_movimiento_caja tmc ON tmc.codigo = mc.tipo
+           GROUP BY mc.caja_id
+      ) m ON m.caja_id = c.id
+     WHERE c.estado = 'ABIERTA';
+
+    -- El promedio incluye todos los días calendario del período, también los ceros.
+    SELECT COALESCE(AVG(d.ingresos), 0), COALESCE(AVG(d.egresos), 0)
+      INTO v_promedio_ingresos_diarios, v_promedio_egresos_diarios
+      FROM generate_series(v_fecha_inicio, CURRENT_DATE, INTERVAL '1 day') AS cal(dia)
+      CROSS JOIN LATERAL (
+          SELECT COALESCE(SUM(CASE WHEN tmc.afecta_saldo = 'INGRESO' THEN mc.monto ELSE 0 END), 0) AS ingresos,
+                 COALESCE(SUM(CASE WHEN tmc.afecta_saldo = 'EGRESO' THEN mc.monto ELSE 0 END), 0) AS egresos
+            FROM public.movimientos_caja mc
+            JOIN public.cajas c ON c.id = mc.caja_id AND c.estado = 'ABIERTA'
+            JOIN public.catalogo_tipos_movimiento_caja tmc ON tmc.codigo = mc.tipo
+           WHERE mc.fecha >= cal.dia
+             AND mc.fecha < cal.dia + INTERVAL '1 day'
+      ) d;
 
     RETURN QUERY
-    SELECT
-        DATE(mc.fecha) AS fecha,
-        'HISTORICO'::CHARACTER VARYING AS tipo_flujo,
-        SUM(CASE WHEN tmc.afecta_saldo = 'INGRESO' THEN mc.monto ELSE 0 END)::NUMERIC(10,2) AS ingresos,
-        SUM(CASE WHEN tmc.afecta_saldo = 'EGRESO' THEN mc.monto ELSE 0 END)::NUMERIC(10,2) AS egresos,
-        (
-            SUM(CASE WHEN tmc.afecta_saldo = 'INGRESO' THEN mc.monto ELSE 0 END)
-            - SUM(CASE WHEN tmc.afecta_saldo = 'EGRESO' THEN mc.monto ELSE 0 END)
-        )::NUMERIC(10,2) AS saldo_neto,
-        (
-            v_saldo_actual
-            + SUM(CASE
-                WHEN tmc.afecta_saldo = 'INGRESO' THEN mc.monto
-                WHEN tmc.afecta_saldo = 'EGRESO' THEN -mc.monto
-                ELSE 0
-            END)
-        )::NUMERIC(10,2) AS saldo_acumulado
-    FROM public.movimientos_caja mc
-    JOIN public.catalogo_tipos_movimiento_caja tmc ON mc.tipo = tmc.codigo
-    WHERE mc.fecha >= v_fecha_inicio
-    GROUP BY DATE(mc.fecha)
-
+    WITH dias AS (
+        SELECT gs::date AS fecha
+          FROM generate_series(v_fecha_inicio, CURRENT_DATE, INTERVAL '1 day') AS gs
+    ), flujo AS (
+        SELECT d.fecha,
+               COALESCE(SUM(CASE WHEN tmc.afecta_saldo = 'INGRESO' THEN mc.monto ELSE 0 END), 0) AS ingresos,
+               COALESCE(SUM(CASE WHEN tmc.afecta_saldo = 'EGRESO' THEN mc.monto ELSE 0 END), 0) AS egresos
+          FROM dias d
+          LEFT JOIN public.movimientos_caja mc
+            ON mc.fecha >= d.fecha AND mc.fecha < d.fecha + INTERVAL '1 day'
+          LEFT JOIN public.cajas c ON c.id = mc.caja_id AND c.estado = 'ABIERTA'
+          LEFT JOIN public.catalogo_tipos_movimiento_caja tmc ON tmc.codigo = mc.tipo
+         WHERE mc.id IS NULL OR c.id IS NOT NULL
+         GROUP BY d.fecha
+    ), saldos AS (
+        SELECT d.fecha,
+               COALESCE(SUM(c.monto_inicial + COALESCE(m.saldo_hasta_fecha, 0)), 0) AS saldo
+          FROM dias d
+          LEFT JOIN public.cajas c
+            ON c.estado = 'ABIERTA' AND c.fecha_apertura < d.fecha + INTERVAL '1 day'
+          LEFT JOIN LATERAL (
+              SELECT SUM(CASE WHEN tmc.afecta_saldo = 'INGRESO' THEN mc.monto
+                              WHEN tmc.afecta_saldo = 'EGRESO' THEN -mc.monto
+                              ELSE 0 END) AS saldo_hasta_fecha
+                FROM public.movimientos_caja mc
+                JOIN public.catalogo_tipos_movimiento_caja tmc ON tmc.codigo = mc.tipo
+               WHERE mc.caja_id = c.id
+                 AND mc.fecha >= c.fecha_apertura
+                 AND mc.fecha < d.fecha + INTERVAL '1 day'
+          ) m ON true
+         GROUP BY d.fecha
+    )
+    SELECT f.fecha, 'HISTORICO'::varchar,
+           f.ingresos::numeric(10,2), f.egresos::numeric(10,2),
+           (f.ingresos - f.egresos)::numeric(10,2), s.saldo::numeric(10,2)
+      FROM flujo f
+      JOIN saldos s USING (fecha)
     UNION ALL
-
-    SELECT
-        (CURRENT_DATE + gs.n)::DATE AS fecha,
-        'PROYECTADO'::CHARACTER VARYING AS tipo_flujo,
-        v_promedio_ingresos_diarios::NUMERIC(10,2) AS ingresos,
-        v_promedio_egresos_diarios::NUMERIC(10,2) AS egresos,
-        (v_promedio_ingresos_diarios - v_promedio_egresos_diarios)::NUMERIC(10,2) AS saldo_neto,
-        (
-            v_saldo_actual
-            + (gs.n * (v_promedio_ingresos_diarios - v_promedio_egresos_diarios))
-        )::NUMERIC(10,2) AS saldo_acumulado
-    FROM generate_series(1, dias_adelante) AS gs(n)
-    ORDER BY fecha ASC;
+    SELECT (CURRENT_DATE + gs.n)::date, 'PROYECTADO'::varchar,
+           v_promedio_ingresos_diarios::numeric(10,2),
+           v_promedio_egresos_diarios::numeric(10,2),
+           (v_promedio_ingresos_diarios - v_promedio_egresos_diarios)::numeric(10,2),
+           (v_saldo_actual + gs.n * (v_promedio_ingresos_diarios - v_promedio_egresos_diarios))::numeric(10,2)
+      FROM generate_series(1, COALESCE(dias_adelante, 30)) AS gs(n)
+     ORDER BY fecha ASC;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 
 -- ================================================================

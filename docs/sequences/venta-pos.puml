@@ -1,0 +1,29 @@
+@startuml
+title Registrar venta POS y descontar inventario
+actor Vendedor
+participant "React Ventas" as UI
+participant "ventaService / Axios" as Client
+participant VentaController as API
+participant VentaService as Service
+database PostgreSQL as DB
+
+Vendedor -> UI: Seleccionar cliente y productos
+UI -> Client: crear venta (cabecera + ítems)
+Client -> API: POST /api/ventas + Bearer JWT
+API -> Service: registrar venta
+Service -> DB: validar productos, precios, cantidades
+Service -> DB: guardar venta e ítems (transacción)
+Service -> DB: insertar movimiento(s) de salida
+DB -> DB: trigger actualiza productos.stock
+DB --> Service: confirmar o rechazar stock insuficiente
+alt stock suficiente
+  Service --> API: venta persistida
+  API --> Client: 201/200 + venta
+  Client --> UI: mostrar confirmación
+else validación o stock insuficiente
+  DB --> Service: error; rollback de transacción
+  Service --> API: error de dominio
+  API --> Client: 4xx con mensaje
+  Client --> UI: mostrar error, sin venta parcial
+end
+@enduml

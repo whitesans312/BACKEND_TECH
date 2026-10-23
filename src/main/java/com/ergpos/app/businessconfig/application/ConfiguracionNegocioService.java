@@ -1,7 +1,7 @@
-package com.ergpos.app.services;
+package com.ergpos.app.businessconfig.application;
 
-import com.ergpos.app.model.ConfiguracionNegocio;
-import com.ergpos.app.repositories.ConfiguracionNegocioRepository;
+import com.ergpos.app.businessconfig.domain.ConfiguracionNegocio;
+import com.ergpos.app.businessconfig.infrastructure.ConfiguracionNegocioRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

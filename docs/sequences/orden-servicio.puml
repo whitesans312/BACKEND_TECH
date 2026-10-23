@@ -1,0 +1,41 @@
+@startuml
+title Confirmar orden de servicio y registrar pago
+actor Administrador
+participant "React Entregas" as UI
+participant "entregaService / Axios" as Client
+participant EntregaController as API
+participant EntregaService as Service
+database PostgreSQL as DB
+
+Administrador -> UI: Confirmar orden completada
+UI -> Client: POST /api/entregas/{id}/confirmar
+Client -> API: solicitud + Bearer JWT
+API -> API: validar rol ADMIN
+API -> Service: confirmar servicio
+Service -> DB: cargar orden, ítems y productos
+Service -> DB: transicionar estado a FINALIZADO
+Service -> DB: insertar movimientos de inventario requeridos
+DB -> DB: trigger aplica movimientos de stock
+DB --> Service: persistencia confirmada
+Service --> API: orden finalizada
+API --> Client: resultado de confirmación
+Client --> UI: actualizar orden
+
+opt pago parcial o saldo
+  Administrador -> UI: Registrar pago
+  UI -> Client: POST /api/entregas/{id}/pagos
+  Client -> API: monto, notas + Bearer JWT
+  API -> API: validar rol ADMIN
+  API -> Service: registrar pago
+  Service -> DB: insertar pago y actualizar estado de pago
+  DB --> Service: pago confirmado
+  Service --> API: resumen de pago
+  API --> Client: 200 OK
+  Client --> UI: actualizar saldo y estado
+end
+
+alt rol no autorizado o regla de negocio incumplida
+  API --> Client: 403/4xx
+  Client --> UI: informar rechazo
+end
+@enduml

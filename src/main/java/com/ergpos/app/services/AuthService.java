@@ -4,18 +4,24 @@ import java.util.Optional;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.ergpos.app.model.Rol;
 import com.ergpos.app.model.Usuario;
+import com.ergpos.app.repositories.RolRepository;
 import com.ergpos.app.repositories.UsuarioRepository;
 
 @Service
 public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
+    private final RolRepository rolRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(UsuarioRepository usuarioRepository, RolRepository rolRepository,
+                       PasswordEncoder passwordEncoder) {
         this.usuarioRepository = usuarioRepository;
+        this.rolRepository = rolRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -46,6 +52,30 @@ public class AuthService {
         if (usuarioRepository.existsByEmail(usuario.getEmail())) {
             throw new EmailAlreadyExistsException("El email ya está registrado: " + usuario.getEmail());
         }
+        usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
+        return usuarioRepository.save(usuario);
+    }
+
+    /** Crea el único administrador inicial si todavía no existe ningún usuario. */
+    @Transactional
+    public Usuario bootstrapAdmin(Usuario usuario) {
+        Rol admin = rolRepository.findAdminForBootstrap()
+                .orElseThrow(() -> new IllegalStateException(
+                        "No existe el rol ADMIN. Ejecute primero el instalador SQL."));
+
+        // El bloqueo pesimista del rol ADMIN serializa intentos simultáneos de bootstrap.
+        if (usuarioRepository.count() > 0) {
+            throw new IllegalStateException("El administrador inicial ya fue creado.");
+        }
+
+        normalizar(usuario);
+        if (usuarioRepository.existsByEmail(usuario.getEmail())) {
+            throw new EmailAlreadyExistsException("El email ya está registrado: " + usuario.getEmail());
+        }
+
+        usuario.setId(null);
+        usuario.setRol(admin);
+        usuario.setActivo(true);
         usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
         return usuarioRepository.save(usuario);
     }

@@ -6,6 +6,7 @@ import java.math.RoundingMode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ergpos.app.businessconfig.application.ConfiguracionNegocioService;
 import com.ergpos.app.model.FacturaVenta;
 import com.ergpos.app.model.Venta;
 import com.ergpos.app.repositories.FacturaVentaRepository;

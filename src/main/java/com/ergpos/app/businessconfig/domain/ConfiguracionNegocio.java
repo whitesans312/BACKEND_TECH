@@ -1,4 +1,4 @@
-package com.ergpos.app.model;
+package com.ergpos.app.businessconfig.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -1,0 +1,33 @@
+@startuml
+title Autenticación y renovación JWT
+actor Usuario
+participant "React Login" as UI
+participant "Axios API" as Client
+participant "AuthController" as API
+participant "AuthService" as Auth
+database PostgreSQL as DB
+
+Usuario -> UI: Ingresar email y contraseña
+UI -> Client: POST /api/auth/login
+Client -> API: credenciales JSON
+API -> Auth: autenticar()
+Auth -> DB: buscar usuario activo
+DB --> Auth: usuario + hash BCrypt + rol
+Auth -> Auth: verificar contraseña y firmar JWT
+Auth --> API: token, expiración y usuario
+API --> Client: 200 OK
+Client --> UI: guardar token y perfil
+
+== Renovación al aproximarse la expiración ==
+Client -> Client: respuesta API detecta < 5 min
+Client -> API: POST /api/auth/refresh (Bearer actual)
+API -> Auth: validar y renovar token
+Auth --> API: nuevo token y expiración
+API --> Client: 200 OK
+Client -> Client: reemplazar token
+
+alt credenciales inválidas o token rechazado
+  API --> Client: 401 Unauthorized
+  Client -> Client: borrar sesión y redirigir a login
+end
+@enduml

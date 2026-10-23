@@ -1,12 +1,17 @@
 package com.ergpos.app.controllers;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,14 +31,17 @@ public class AuthController {
     private final JwtService jwtService;
     private final AuditoriaService auditoriaService;
     private final UsuarioRepository usuarioRepository;
+    private final String bootstrapToken;
 
     public AuthController(AuthService authService, JwtService jwtService,
                           AuditoriaService auditoriaService,
-                          UsuarioRepository usuarioRepository) {
+                          UsuarioRepository usuarioRepository,
+                          @Value("${app.bootstrap.token:}") String bootstrapToken) {
         this.authService = authService;
         this.jwtService = jwtService;
         this.auditoriaService = auditoriaService;
         this.usuarioRepository = usuarioRepository;
+        this.bootstrapToken = bootstrapToken;
     }
 
     public static class LoginRequest {
@@ -84,6 +92,38 @@ public class AuthController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    /** Crea el primer administrador en una base vacía. Solo funciona una vez. */
+    @PostMapping("/bootstrap")
+    public ResponseEntity<Object> bootstrap(
+            @RequestHeader(value = "X-Bootstrap-Token", required = false) String providedToken,
+            @Valid @RequestBody Usuario usuario) {
+        if (!tokenBootstrapValido(providedToken)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Token de inicialización inválido o no configurado.");
+        }
+        try {
+            Usuario creado = authService.bootstrapAdmin(usuario);
+            auditoriaService.registrar(
+                creado.getId(), creado.getNombre(),
+                "BOOTSTRAP_ADMIN", "SEGURIDAD",
+                creado.getId(), "Administrador inicial creado"
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(creado);
+        } catch (AuthService.EmailAlreadyExistsException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        }
+    }
+
+    private boolean tokenBootstrapValido(String providedToken) {
+        return bootstrapToken != null && !bootstrapToken.isBlank()
+                && providedToken != null
+                && MessageDigest.isEqual(
+                        bootstrapToken.getBytes(StandardCharsets.UTF_8),
+                        providedToken.getBytes(StandardCharsets.UTF_8));
     }
 
     /**

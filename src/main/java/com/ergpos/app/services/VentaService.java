@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ergpos.app.businessconfig.application.ConfiguracionNegocioService;
 import com.ergpos.app.model.Cliente;
 import com.ergpos.app.model.FacturaVenta;
 import com.ergpos.app.model.MovimientoInventario;

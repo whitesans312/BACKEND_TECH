@@ -1,8 +1,8 @@
-package com.ergpos.app.controllers;
+package com.ergpos.app.businessconfig.api;
 
-import com.ergpos.app.model.ConfiguracionNegocio;
+import com.ergpos.app.businessconfig.application.ConfiguracionNegocioService;
+import com.ergpos.app.businessconfig.domain.ConfiguracionNegocio;
 import com.ergpos.app.services.AuditoriaService;
-import com.ergpos.app.services.ConfiguracionNegocioService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
