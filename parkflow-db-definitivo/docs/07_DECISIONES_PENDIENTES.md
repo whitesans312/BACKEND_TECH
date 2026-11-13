@@ -1,6 +1,6 @@
 # 07 — Decisiones pendientes
 
-**Actualizado:** 2026-11-12. Las migraciones activas (Parking V1–V4, Identity V1–V3 y Billing V1–V4) se validaron en PostgreSQL 16.15 temporal. La situación de código y los alcances no implementados están en [`PARKFLOW_IMPLEMENTATION_ROADMAP.md`](../../PARKFLOW_IMPLEMENTATION_ROADMAP.md). Esta lista contiene decisiones comerciales o de operación aún no resueltas; no bloquean los flujos ya implementados.
+**Actualizado:** 2026-11-13. Las migraciones activas (Parking V1–V4, Identity V1–V3 y Billing V1–V4) se validaron en PostgreSQL 16.15 temporal. Las suites de Identity, Parking y Billing también pasaron con Docker/Testcontainers; ver [`PARKFLOW_IMPLEMENTATION_ROADMAP.md`](../../PARKFLOW_IMPLEMENTATION_ROADMAP.md). Esta lista contiene decisiones comerciales o de operación aún no resueltas; no bloquean los flujos ya implementados.
 
 ## Decisiones comerciales que requieren al propietario
 
@@ -55,5 +55,5 @@ La prohibición de que un usuario se autorice a sí mismo no está resuelta. Tam
 ## Pendientes técnicos (no son decisiones comerciales)
 
 - Traslados, mantenimiento, anulaciones, autorizaciones de salida excepcional y expediente de abandono/retiro deben implementarse antes de afirmar cobertura completa. Ver el roadmap.
-- Extender pruebas para concurrencia real, reintentos simultáneos, fallos de red y reconciliación. Testcontainers no se ejecutó en el entorno actual al no disponer de Docker.
+- Extender pruebas para concurrencia real, reintentos simultáneos, fallos de red y reconciliación, más allá de las suites Testcontainers actuales que ya se ejecutaron con Docker.
 - Determinar la necesidad de API Gateway, observabilidad, copias/restauración y política de despliegue antes de producción.

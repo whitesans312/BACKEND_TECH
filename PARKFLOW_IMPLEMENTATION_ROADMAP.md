@@ -1,6 +1,6 @@
 # ParkFlow — estado de implementación
 
-**Actualizado:** 2026-11-12. Este documento reemplaza el diagnóstico estático anterior, que describía un estado ya superado.
+**Actualizado:** 2026-11-13. Este documento reemplaza el diagnóstico estático anterior, que describía un estado ya superado.
 
 ## Arquitectura activa
 
@@ -34,12 +34,12 @@ ParkFlow tiene tres servicios Spring Boot independientes y tres bases PostgreSQL
 
 ## Validación ejecutada
 
-- Suites Maven de Parking, Identity y Billing: pasaron (sin fallos ni errores). Los tests Testcontainers se omiten en esta máquina porque no hay daemon Docker.
+- Suites Maven ejecutadas con Docker 29.3.1 y Testcontainers: Identity 27 tests, Parking 36 tests y Billing 27 tests; cero fallos y cero errores, un test omitido por servicio.
 - Pruebas Flyway contra PostgreSQL 16.15 temporal: Parking V1–V4, Identity V1–V3 y Billing V1–V4 validadas; las tres bases estaban actualizadas y Flyway no detectó cambios pendientes.
 - Build de producción del frontend (`npm run build`): pasó.
 - Flujo HTTP real en el clúster temporal: entrada, liquidación por $6.000, aprobación en efectivo, una fila de pago aprobado, un movimiento de caja, un comprobante, cierre de Parking y reintento idempotente 200 sin duplicar filas.
 - Confirmado además por API: se cerró una sesión de caja con un vehículo aún activo en Parking, y se canceló una liquidación pendiente conservando activa la sesión y su espacio.
-- La cobertura de concurrencia y de todos los flujos no equivale a validación de producción. Los tests de Testcontainers no se ejecutaron por ausencia de Docker.
+- La cobertura de concurrencia y de todos los flujos no equivale a validación de producción. Las suites actuales con Testcontainers pasan, pero aún se requieren escenarios adicionales de concurrencia, fallos de red y reconciliación.
 
 ## Decisiones comerciales pendientes
 
