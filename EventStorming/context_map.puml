@@ -1,0 +1,14 @@
+@startuml
+title ParkFlow — Mapa de contextos
+skinparam componentStyle rectangle
+component "Identidad y acceso\n(Identity Service)" as I
+component "Operación del parqueadero\n(Parking Service)" as P
+component "Facturación y caja\n(Billing Service)" as B
+component "Frontend\nReact / TypeScript" as F
+P --> B : Cliente-Proveedor\nREST + clave idempotente
+P ..> I : Open Host Service\nJWKS (valida JWT)
+B ..> I : Open Host Service\nJWKS (valida JWT)
+F --> I : REST + JWT
+F --> P : REST + JWT
+F --> B : REST + JWT
+@enduml

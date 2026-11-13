@@ -1,0 +1,71 @@
+@startuml
+title ParkFlow — Ingreso, liquidación, pago y salida
+autonumber
+actor Operador
+participant "Frontend\nReact / TypeScript" as UI
+participant "Parking Service" as P
+database "db_parking" as DBP
+participant "Identity Service" as I
+participant "Billing Service" as B
+database "db_billing" as DBB
+ 
+== Inicio de sesión ==
+Operador -> UI: Ingresa correo y contraseña
+UI -> I: POST /api/auth/login
+I -> I: Valida credenciales y roles
+I --> UI: JWT firmado con RS256
+ 
+== Registro de entrada ==
+Operador -> UI: Registra placa y tipo\nSelecciona espacio disponible
+UI -> P: POST /api/sesiones/entradas\nAuthorization: Bearer JWT
+P -> I: Consulta JWKS para validar firma
+I --> P: Claves públicas JWKS
+P -> P: Valida permisos e idempotencia
+P -> DBP: Guarda sesión y ocupa el espacio
+DBP --> P: Sesión creada con tiquete
+P --> UI: Confirma ingreso y número de tiquete
+UI --> Operador: Muestra tiquete
+ 
+== Solicitud de liquidación ==
+Operador -> UI: Busca vehículo y solicita liquidación
+UI -> P: Buscar sesión activa por placa o tiquete
+P -> DBP: Consulta sesión y hora de ingreso
+DBP --> P: Datos de la sesión
+P -> B: Crear/recuperar liquidación\ncon clave idempotente
+B -> DBB: Calcula y guarda liquidación
+DBB --> B: Liquidación pendiente e importe
+B --> P: Importe y estado
+P --> UI: Muestra valor a cobrar
+UI --> Operador: Presenta total
+ 
+alt El cliente decide no salir
+  Operador -> UI: Cancela la solicitud de salida
+  UI -> B: Cancelar liquidación pendiente
+  B -> DBB: Marca liquidación como CANCELADA
+  B --> UI: Cancelación confirmada
+  UI --> Operador: Vehículo sigue estacionado
+  note over P,DBP
+    La sesión continúa activa
+    y el espacio sigue ocupado.
+  end note
+else El operador recibe el efectivo
+  Operador -> UI: Confirma efectivo recibido
+  UI -> B: Resolver pago en efectivo
+  B -> DBB: Transacción local
+  note right of DBB
+    Registra de forma consistente:
+    pago aprobado,
+    movimiento de caja,
+    comprobante.
+  end note
+  DBB --> B: Pago confirmado
+  B --> UI: Pago aprobado y comprobante
+  UI -> P: Confirmar cierre de sesión
+  P -> B: Verifica resultado terminal
+  B --> P: Liquidación PAGADA o GRATUITA
+  P -> DBP: Cierra sesión y libera espacio
+  DBP --> P: Cierre confirmado
+  P --> UI: Salida completada
+  UI --> Operador: Muestra confirmación
+end
+@enduml

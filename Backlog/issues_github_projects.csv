@@ -1,0 +1,216 @@
+title,body,label
+[E1] Identidad y acceso,"Login, usuarios, roles y autorización.",epic
+[E2] Pisos y espacios,Configuración y consulta de disponibilidad.,epic
+[E3] Entradas y salidas,"Registro de sesiones, tiquetes, búsqueda y cierre.",epic
+[E4] Tarifas y liquidación,Administración de tarifas y cálculo del valor por cobrar.,epic
+[E5] Pagos y comprobantes,"Pago en efectivo, caja, movimientos y comprobantes.",epic
+[E6] Panel de operación,Interfaz web para operadores y administradores.,epic
+[HU-01] Inicio de sesión,"Como operador, quiero iniciar sesión para usar el sistema de forma segura.
+
+```gherkin
+# language: es
+Característica: Inicio de sesión
+
+  Escenario: Credenciales válidas
+    Dado que existe un usuario activo con rol OPERADOR
+    Cuando envía su correo y contraseña correctos a POST /api/auth/login
+    Entonces recibe un JWT firmado con RS256
+    Y el token identifica al usuario y su rol
+
+  Escenario: Credenciales inválidas
+    Dado que existe un usuario activo
+    Cuando envía una contraseña incorrecta
+    Entonces el acceso es rechazado
+    Y no se emite ningún token
+```
+
+Épica: E1",user-story
+[HU-02] Gestión de usuarios y roles,"Como administrador, quiero gestionar usuarios y roles.
+
+```gherkin
+# language: es
+Característica: Gestión de usuarios y roles
+
+  Escenario: Crear usuario con roles
+    Dado que el administrador está autenticado
+    Cuando crea un usuario con nombre, correo, contraseña y rolIds en POST /api/users
+    Entonces el usuario queda creado con los roles indicados
+
+  Escenario: Un operador no administra usuarios
+    Dado que un operador está autenticado
+    Cuando intenta crear o modificar un usuario
+    Entonces el sistema rechaza la operación por falta de permisos
+```
+
+Épica: E1",user-story
+[HU-03] Configuración física del parqueadero,"Como administrador, quiero configurar pisos, zonas y espacios.
+
+```gherkin
+# language: es
+Característica: Configuración física del parqueadero
+
+  Escenario: Crear configuración compuesta
+    Dado que el administrador está autenticado
+    Cuando envía un piso con sus zonas y la cantidad de espacios por tipo (CARRO o MOTO)
+    Entonces se crean el piso, las zonas y los espacios asociados
+
+  Escenario: Deshabilitar un espacio
+    Dado que existe un espacio disponible
+    Cuando el administrador lo deshabilita
+    Entonces el espacio deja de ofrecerse para nuevas entradas
+```
+
+Épica: E2",user-story
+[HU-04] Disponibilidad por piso,"Como operador, quiero consultar la disponibilidad por piso.
+
+```gherkin
+# language: es
+Característica: Disponibilidad por piso
+
+  Escenario: Consultar espacios de un piso
+    Dado que el operador está autenticado y existe un piso con espacios
+    Cuando consulta los espacios filtrando por ese piso
+    Entonces ve cada espacio con su tipo y su estado operativo
+```
+
+Épica: E2",user-story
+[HU-05] Registro de entrada,"Como operador, quiero registrar un vehículo y asignarle un espacio compatible.
+
+```gherkin
+# language: es
+Característica: Registro de entrada
+
+  Escenario: Entrada exitosa
+    Dado un espacio disponible, habilitado y compatible con el tipo de vehículo
+    Cuando el operador registra placa, tipo y espacio con una Idempotency-Key
+    Entonces se crea la sesión ACTIVA y se ocupa el espacio
+    Y se devuelve el número de tiquete
+
+  Escenario: Espacio ocupado o incompatible
+    Dado un espacio ocupado, deshabilitado o de otro tipo
+    Cuando el operador intenta asignarlo
+    Entonces la entrada es rechazada y no se crea la sesión
+
+  Escenario: Reintento con la misma clave
+    Dado que una entrada ya fue registrada con una Idempotency-Key
+    Cuando se repite la solicitud con la misma clave
+    Entonces se devuelve el resultado original sin duplicar la sesión
+```
+
+Épica: E3",user-story
+[HU-06] Liquidación de la estadía,"Como operador, quiero calcular el valor de la estadía cuando el cliente solicita salir.
+
+```gherkin
+# language: es
+Característica: Liquidación de la estadía
+
+  Escenario: Dentro de los 15 minutos de gracia
+    Dado una sesión activa con 10 minutos de permanencia
+    Cuando el operador solicita la salida
+    Entonces la liquidación tiene total 0 y estado GRATUITA
+
+  Escenario: Hasta 180 minutos facturables
+    Dado un carro con 2 horas y 15 minutos de permanencia
+    Cuando se solicita la liquidación
+    Entonces se cobran las horas facturables a $6.000 por hora
+
+  Escenario: Más de 180 minutos facturables
+    Dado un carro con más de 180 minutos facturables
+    Cuando se solicita la liquidación
+    Entonces se aplica la tarifa diaria completa de $18.000 en lugar del cobro por horas
+```
+
+Épica: E4",user-story
+[HU-07] Pago en efectivo,"Como operador, quiero confirmar el efectivo recibido y dejar constancia del cobro.
+
+```gherkin
+# language: es
+Característica: Pago en efectivo
+
+  Escenario: Pago completo en efectivo
+    Dado una liquidación pendiente y una sesión de caja abierta
+    Cuando el operador confirma el efectivo recibido
+    Entonces se registran en una sola transacción el pago aprobado, el movimiento de caja y el comprobante
+
+  Escenario: No se aceptan pagos parciales
+    Dado una liquidación pendiente
+    Cuando se intenta pagar un valor menor al total
+    Entonces el pago no se aprueba
+```
+
+Épica: E5",user-story
+[HU-08] Cierre de la salida,"Como operador, quiero cerrar la salida después de confirmarse el resultado de Billing.
+
+```gherkin
+# language: es
+Característica: Cierre de la salida
+
+  Escenario: Cierre con liquidación pagada o gratuita
+    Dado una liquidación en estado PAGADA o GRATUITA
+    Cuando el operador confirma el cierre
+    Entonces Parking cierra la sesión y libera el espacio
+
+  Escenario: Billing sin resultado terminal
+    Dado que Billing no está disponible o la liquidación sigue pendiente
+    Cuando el operador intenta cerrar la sesión
+    Entonces la sesión permanece ACTIVA y el espacio ocupado
+
+  Escenario: El cliente decide no salir
+    Dado una liquidación pendiente
+    Cuando el operador la cancela
+    Entonces la liquidación pasa a CANCELADA y la sesión sigue ACTIVA
+```
+
+Épica: E3",user-story
+[HU-09] Actualización de tarifas,"Como administrador, quiero actualizar tarifas sin alterar liquidaciones históricas.
+
+```gherkin
+# language: es
+Característica: Actualización de tarifas
+
+  Escenario: Nueva tarifa vigente
+    Dado que existen liquidaciones calculadas con la tarifa anterior
+    Cuando el administrador actualiza la tarifa vigente
+    Entonces las liquidaciones nuevas usan el valor actualizado
+    Y las liquidaciones anteriores conservan su importe original
+```
+
+Épica: E4",user-story
+[HT-01] Versionar el esquema de cada servicio con Flyway,"Estado: Implementada
+
+Criterio de aceptación: Dado que se despliega un servicio, cuando arranca, entonces aplica sus migraciones (Parking V1–V5, Identity V1–V3, Billing V1–V4) sobre su propia base.",technical-story
+[HT-02] Emitir JWT RS256 y publicar JWKS en Identity,"Estado: Implementada
+
+Criterio de aceptación: Dado un JWT emitido por Identity, cuando Parking o Billing lo reciben, entonces validan la firma con la clave pública de /.well-known/jwks.json.",technical-story
+"[HT-03] Idempotencia con Idempotency-Key en entradas, salidas y liquidaciones","Estado: Implementada
+
+Criterio de aceptación: Dado una solicitud repetida con la misma clave, entonces se recupera el resultado original sin duplicar datos.",technical-story
+[HT-04] Cliente REST de Parking hacia Billing para crear o recuperar liquidaciones,"Estado: Implementada
+
+Criterio de aceptación: Dado una salida solicitada, entonces Parking obtiene la liquidación de Billing con la clave idempotente.",technical-story
+[HT-05] Sacar la llamada HTTP a Billing de la transacción y del bloqueo de sesión en solicitarSalida,"Estado: Pendiente
+
+Criterio de aceptación: Dado una salida solicitada, entonces la llamada a Billing se ejecuta sin mantener abierta la transacción local ni el bloqueo de la sesión.",technical-story
+[HT-06] Validar la migración Parking V5 en PostgreSQL temporal,"Estado: Pendiente
+
+Criterio de aceptación: Dado una base temporal, cuando se ejecutan Parking V1–V5, entonces todas pasan y se actualiza la evidencia.",technical-story
+[HT-07] Agregar healthchecks a las APIs en Docker Compose,"Estado: Pendiente
+
+Criterio de aceptación: Dado el despliegue local, entonces cada servicio espera a que sus dependencias estén saludables, no solo iniciadas.",technical-story
+[HT-08] Normalizar los prefijos de ruta de Parking (/api/v1 frente a /api/zonas y /api/sesiones),"Estado: Pendiente
+
+Criterio de aceptación: Dado el catálogo de endpoints de Parking, entonces todas las rutas siguen un mismo prefijo versionado.",technical-story
+[HT-09] Definir un rol técnico servicio a servicio para las rutas /internal/v1 de Billing,"Estado: Pendiente
+
+Criterio de aceptación: Dado una llamada a /internal/v1, entonces solo la acepta un token de servicio y no uno de usuario operador.",technical-story
+"[HT-10] Ampliar pruebas de concurrencia, fallos de red y reintentos simultáneos","Estado: Pendiente
+
+Criterio de aceptación: Dado reintentos simultáneos de pago o cierre, entonces no se genera un segundo cobro ni un cierre duplicado.",technical-story
+[RNF-01] Seguridad,Contraseñas almacenadas mediante hash y comunicación protegida en despliegue.,non-functional
+[RNF-02] Seguridad,Separación de credenciales de aplicación y migración de bases de datos.,non-functional
+[RNF-03] Integridad,Cada servicio es propietario de su base; no consulta tablas de otro servicio.,non-functional
+[RNF-04] Consistencia,No mantener transacciones de base de datos abiertas durante llamadas HTTP.,non-functional
+[RNF-05] Confiabilidad,Liquidaciones y cierres soportan idempotencia y reintentos controlados.,non-functional
+[RNF-06] Trazabilidad,"Pagos aprobados, comprobantes y sesiones cerradas conservan su historial.",non-functional
+[RNF-07] Mantenibilidad,Esquemas versionados con Flyway y servicios independientes.,non-functional
+[RNF-08] Portabilidad,Java 21 y PostgreSQL 16.,non-functional
