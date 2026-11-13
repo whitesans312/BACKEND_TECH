@@ -89,3 +89,21 @@ Las salidas excepcionales, transferencias, mantenimiento, anulaciones, tiquete p
 - `../frontend`: aplicación React.
 - [Estado de implementación, validaciones y límites](PARKFLOW_IMPLEMENTATION_ROADMAP.md).
 - [Guía paso a paso para instalar y ejecutar ParkFlow en otro computador](Como%20instalar%20y%20hacer%20funcionar%20el%20programa/README.md).
+
+## Entregables del primer avance
+
+| Carpeta | Contenido |
+|---|---|
+| `Backlog/` | Épicas, historias de usuario, criterios de aceptación en Gherkin (`CriteriosAceptacion/*.feature`), historias técnicas, requerimientos no funcionales, `issues_github_projects.csv` y `crear_issues.sh` |
+| `ADRs/` | Una decisión de arquitectura por archivo `.md` |
+| `JobStories/` | Una job story por archivo `.md` |
+| `JTBD/` | Jobs To Be Done por actor |
+| `Secuencias/` | Diagrama de secuencia en PlantUML |
+| `QueriesActions/` | Queries y Actions por servicio |
+| `EventStorming/` | Proceso de event storming, bounded contexts, microservicios candidatos y patrones de interacción |
+
+**Integrantes:** Sebastián Santos, Sebastián Urbano y Samuel Grajales.
+
+- Backend: https://github.com/whitesans312/BACKEND_TECH
+- Frontend: https://github.com/whitesans312/FRONT_TECH
+- Jira: https://miniproyecto2equipo2.atlassian.net/jira/core/projects/PROD/timeline
