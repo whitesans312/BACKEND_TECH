@@ -1,0 +1,5 @@
+package com.parkflow.identity.api;
+import java.util.Set;
+import java.util.UUID;
+import jakarta.validation.constraints.NotNull;
+public record RolesUsuarioRequest(@NotNull Set<UUID> rolIds) {}

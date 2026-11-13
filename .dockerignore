@@ -3,6 +3,7 @@
 .vscode
 .sixth
 target
+**/target
 logs
 
 .env
@@ -23,3 +24,4 @@ HELP.md
 DATABASE_SCHEMA.md
 walkthrough.md
 *.code-workspace
+frontend

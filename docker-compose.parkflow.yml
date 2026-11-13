@@ -1,0 +1,116 @@
+name: parkflow-local
+services:
+  postgres:
+    image: postgres:16.15
+    container_name: parkflow-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: parkflow_admin
+      POSTGRES_PASSWORD: ${PARKFLOW_PG_ADMIN_PASSWORD:-parkflow_admin_dev_only}
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "${PARKFLOW_PG_PORT:-55433}:5432"
+    volumes:
+      - parkflow_pg16_data:/var/lib/postgresql/data
+      - ./parkflow-db-definitivo/infrastructure/01_create_roles_and_databases.sql:/docker-entrypoint-initdb.d/01_create_roles_and_databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parkflow_admin -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  identity:
+    build:
+      context: .
+      dockerfile: services/identity-service/Dockerfile
+    container_name: parkflow-identity
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PORT: 8081
+      IDENTITY_DB_HOST: postgres
+      IDENTITY_DB_PORT: 5432
+      IDENTITY_DB_NAME: db_identity
+      IDENTITY_DB_USERNAME: identity_app
+      IDENTITY_DB_PASSWORD: identity_app_dev_only
+      IDENTITY_FLYWAY_ENABLED: "true"
+      IDENTITY_DB_MIGRATION_USERNAME: identity_migrator
+      IDENTITY_DB_MIGRATION_PASSWORD: identity_migrator_dev_only
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-https://identity.parkflow.local}
+      IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-parkflow-api}
+      IDENTITY_JWT_PRIVATE_KEY_B64: ${IDENTITY_JWT_PRIVATE_KEY_B64:?Set RSA PKCS8 private key DER as Base64 in .env.parkflow}
+      IDENTITY_JWT_PUBLIC_KEY_B64: ${IDENTITY_JWT_PUBLIC_KEY_B64:?Set RSA public key DER as Base64 in .env.parkflow}
+      PARKFLOW_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+    ports: ["${IDENTITY_HTTP_PORT:-8081}:8081"]
+
+  parking:
+    build:
+      context: .
+      dockerfile: services/parking-service/Dockerfile
+    container_name: parkflow-parking
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      identity: { condition: service_started }
+      billing: { condition: service_started }
+    environment:
+      PORT: 8080
+      PARKING_SERVER_ADDRESS: 0.0.0.0
+      PARKING_DB_HOST: postgres
+      PARKING_DB_PORT: 5432
+      PARKING_DB_NAME: db_parking
+      PARKING_DB_USERNAME: parking_app
+      PARKING_DB_PASSWORD: parking_app_dev_only
+      PARKING_FLYWAY_ENABLED: "true"
+      PARKING_DB_MIGRATION_USERNAME: parking_migrator
+      PARKING_DB_MIGRATION_PASSWORD: parking_migrator_dev_only
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-https://identity.parkflow.local}
+      IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-parkflow-api}
+      IDENTITY_JWKS_URI: http://identity:8081/.well-known/jwks.json
+      BILLING_SERVICE_URL: http://billing:8083
+      PARKFLOW_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+    ports: ["${PARKING_HTTP_PORT:-8080}:8080"]
+
+  billing:
+    build:
+      context: .
+      dockerfile: services/billing-service/Dockerfile
+    container_name: parkflow-billing
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      PORT: 8083
+      BILLING_SERVER_ADDRESS: 0.0.0.0
+      BILLING_DB_HOST: postgres
+      BILLING_DB_PORT: 5432
+      BILLING_DB_NAME: db_billing
+      BILLING_DB_USERNAME: billing_app
+      BILLING_DB_PASSWORD: billing_app_dev_only
+      BILLING_FLYWAY_ENABLED: "true"
+      BILLING_DB_MIGRATION_USERNAME: billing_migrator
+      BILLING_DB_MIGRATION_PASSWORD: billing_migrator_dev_only
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-https://identity.parkflow.local}
+      IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-parkflow-api}
+      IDENTITY_JWKS_URI: http://identity:8081/.well-known/jwks.json
+      PARKFLOW_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+    ports: ["${BILLING_HTTP_PORT:-8083}:8083"]
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_IDENTITY_URL: ${VITE_IDENTITY_URL:-http://localhost:8081}
+        VITE_PARKING_URL: ${VITE_PARKING_URL:-http://localhost:8080}
+        VITE_BILLING_URL: ${VITE_BILLING_URL:-http://localhost:8083}
+    container_name: parkflow-frontend
+    restart: unless-stopped
+    depends_on: [identity, parking, billing]
+    ports: ["${FRONTEND_HTTP_PORT:-5173}:80"]
+
+volumes:
+  parkflow_pg16_data:

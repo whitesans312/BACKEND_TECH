@@ -1,227 +1,90 @@
-# ERG-POS — Backend
+# ParkFlow
 
-Sistema POS para gestión de servicios técnicos, inventario, ventas y facturación de repuestos de sillas ergonómicas.
+ParkFlow está organizado como tres microservicios Spring Boot, cada uno con su propia base PostgreSQL. El frontend React consume las APIs desde el navegador.
 
-- **Base de datos:** PostgreSQL (Supabase)
-- **Stack:** Java 21 · Spring Boot 3.5 · Lombok · JPA/Hibernate
-- **Esquema BD:** ver [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)
+| Componente | Puerto local | Base de datos |
+| --- | ---: | --- |
+| Identity | 8081 | `db_identity` |
+| Parking | 8080 | `db_parking` |
+| Billing | 8083 | `db_billing` |
+| React | 5173 | — |
+| PostgreSQL local de ParkFlow | 55433 | — |
 
----
+La arquitectura no usa claves foráneas entre bases. Los cambios de operación que cruzan servicios usan JWT e idempotencia. No ejecutes los SQL de `parkflow-db-nuevo` ni los modelos anteriores: la implementación activa está en `parkflow-db-definitivo/`.
 
-## Cómo correr
+## Iniciar el entorno local con Docker
 
-```bash
-# En la carpeta del backend (donde está el pom.xml)
-mvn spring-boot:run
+Requisitos: Docker Desktop con Compose v2 y Java 21/Maven solo si vas a ejecutar los servicios fuera de Docker.
+
+1. Copia `.env.parkflow.example` a `.env.parkflow`.
+2. Genera las llaves RSA con `powershell -ExecutionPolicy Bypass -File .\scripts\New-ParkFlowJwtKeys.ps1`. El script guarda la llave privada PKCS#8 y la llave pública DER en Base64 dentro de `.env.parkflow`, elimina los temporales y no imprime los valores. Mantén ese archivo privado y fuera de Git.
+3. Desde `backend`, inicia el stack:
+
+```powershell
+docker compose --env-file .env.parkflow -f docker-compose.parkflow.yml up --build
 ```
 
-El servidor queda en: `http://localhost:8080/api`
+La primera inicialización crea un volumen Docker nuevo, las tres bases y roles locales, y ejecuta las migraciones con los usuarios migradores. El mapeo de PostgreSQL usa el puerto `55433` para no interferir con una instancia PostgreSQL existente en `5432`. Conserva el volumen entre reinicios. No uses `docker compose down -v` si quieres conservar los datos locales.
 
-> **Antes de la primera ejecución:** ejecutar el script completo de `DATABASE_SCHEMA.md`
-> (sección SQL) en el Editor SQL de Supabase. **El orden importa**, hay dependencias entre bloques.
+Abre el frontend en `http://localhost:5173`. Health checks:
 
----
+- Identity: `http://localhost:8081/.well-known/jwks.json`.
+- Parking: `http://localhost:8080/api/v1/health`.
+- Billing: `http://localhost:8083/api/billing/health`.
 
-## Variables de entorno (`application.properties`)
+La primera cuenta se crea una sola vez con:
 
-| Variable | Descripción |
-|----------|-------------|
-| `spring.datasource.url` | URL JDBC de Supabase (jdbc:postgresql://...) |
-| `spring.datasource.username` | Usuario de la BD |
-| `spring.datasource.password` | Contraseña de la BD |
-| `app.jwt.secret` | Clave secreta para firmar JWT (HS256). **Cambiar en producción** |
-| `app.jwt.expiration-ms` | Duración del token en milisegundos (default: 28800000 = 8 horas) |
-
----
-
-## Autenticación — JWT (JSON Web Token)
-
-Todos los endpoints protegidos requieren un token JWT en el header:
-```bash
-Authorization: Bearer <token_jwt>
+```powershell
+$body = @{ nombre = 'Administrador'; email = 'admin@parkflow.local'; password = 'CambiaEstaClave123' } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8081/api/auth/register -ContentType 'application/json' -Body $body
 ```
 
-**Generación del token:**
-1. Login: `POST /api/auth/login` con email y password
-2. Respuesta incluye el token JWT con validez de 8 horas (configurable)
+La ruta bootstrap asigna `ADMINISTRADOR` únicamente si todavía no hay usuarios. Después, inicia sesión desde el frontend y usa una contraseña propia.
 
-**Claims del token:**
-- `sub`: Email del usuario
-- `userId`: UUID del usuario
-- `name`: Nombre del usuario
-- `role`: Rol asignado (ADMIN, TECNICO, INVENTARIO)
-- `iat`: Timestamp emisión
-- `exp`: Timestamp expiración
+Para detener los servicios y mantener los datos:
 
-**Algoritmo:** HS256 (HMAC-SHA256)
-
-> **Importante:** La clave secreta `app.jwt.secret` es de desarrollo. Cambiar en producción a una cadena segura de 32+ caracteres.
-
----
-
-## Endpoints
-
-### 🔐 Auth
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| POST | `/api/auth/login` | Login — devuelve datos del usuario |
-| POST | `/api/auth/register` | Crear cuenta nueva |
-
----
-
-### 👥 Usuarios
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/usuarios` | Todos los usuarios |
-| GET | `/api/usuarios/activos` | Solo activos |
-| GET | `/api/usuarios/tecnicos` | Técnicos activos (para asignar órdenes) |
-| GET | `/api/usuarios/{id}` | Por ID |
-| POST | `/api/usuarios` | Crear usuario |
-| PUT | `/api/usuarios/{id}` | Actualizar datos |
-| PATCH | `/api/usuarios/{id}/activar?activo=true` | Activar / Desactivar |
-| PATCH | `/api/usuarios/{id}/password` | Cambiar contraseña |
-| DELETE | `/api/usuarios/{id}` | Desactivar |
-
----
-
-### 👤 Clientes
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/clientes` | Todos los clientes |
-| GET | `/api/clientes/activos` | Solo activos |
-| GET | `/api/clientes/{id}` | Por ID |
-| POST | `/api/clientes` | Crear cliente |
-| PUT | `/api/clientes/{id}` | Actualizar |
-| PATCH | `/api/clientes/{id}/activar?activo=true` | Activar / Desactivar |
-
----
-
-### 🏭 Proveedores
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/proveedores` | Todos |
-| GET | `/api/proveedores/activos` | Solo activos |
-| GET | `/api/proveedores/{id}` | Por ID |
-| POST | `/api/proveedores` | Crear |
-| PUT | `/api/proveedores/{id}` | Actualizar |
-| PATCH | `/api/proveedores/{id}/activar?activo=true` | Activar / Desactivar |
-
----
-
-### 📦 Productos
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/productos` | Todos |
-| GET | `/api/productos/activos` | Solo activos |
-| GET | `/api/productos/stock-bajo` | Stock ≤ stockMinimo |
-| GET | `/api/productos/buscar?q=rueda` | Buscar por nombre o código |
-| GET | `/api/productos/{id}` | Por ID |
-| GET | `/api/productos/codigo/{codigo}` | Por código interno |
-| POST | `/api/productos` | Crear |
-| PUT | `/api/productos/{id}` | Actualizar |
-| PATCH | `/api/productos/{id}/activar?activo=true` | Activar / Desactivar |
-| DELETE | `/api/productos/{id}` | Desactivar |
-
----
-
-### 🗂️ Categorías
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/categorias` | Todas las categorías |
-| GET | `/api/categorias/activas` | Solo activas |
-| GET | `/api/categorias/{id}` | Por ID |
-| POST | `/api/categorias` | Crear |
-| PUT | `/api/categorias/{id}` | Actualizar |
-
----
-
-### 🔧 Órdenes de Servicio (Entregas)
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/entregas` | Todas las órdenes |
-| GET | `/api/entregas/{id}` | Por ID |
-| GET | `/api/entregas/estado/{estado}` | Filtrar por estado |
-| GET | `/api/entregas/tecnico/{tecnicoId}` | Por técnico asignado |
-| GET | `/api/entregas/resumen` | Conteo de órdenes por estado |
-| GET | `/api/entregas/contadores` | Contadores: `porConfirmar`, `pagoPendiente` |
-| GET | `/api/entregas/pago-pendiente` | Entregas con pago pendiente |
-| GET | `/api/entregas/por-confirmar` | Entregas pendientes de confirmar (COMPLETADAS sin FINALIZAR) |
-| POST | `/api/entregas` | Crear orden |
-| PUT | `/api/entregas/{id}` | Editar orden (técnico, dirección, cliente, tipo, descripción, mano de obra) |
-| PATCH | `/api/entregas/{id}/estado?estado=EN_PROCESO&notas=ok` | Cambiar estado (admin solo para CANCELADO) |
-| POST | `/api/entregas/{id}/confirmar?adminId=uuid` | Confirmar servicio — pone FINALIZADO, descuenta stock |
-| POST | `/api/entregas/{id}/pagos?monto=X&notas=Y&usuarioId=uuid` | Registrar pago parcial |
-| PATCH | `/api/entregas/{id}/anticipo?porcentaje=50` | Guardar % de anticipo acordado |
-| DELETE | `/api/entregas/{id}` | Cancelar orden (solo admin) |
-
-**Flujo de estados:**
+```powershell
+docker compose --env-file .env.parkflow -f docker-compose.parkflow.yml down
 ```
-PENDIENTE → EN_PROCESO → COMPLETADO → FINALIZADO
-               ↘ (cualquier estado) → CANCELADO
+
+## Desarrollo sin Docker para Java
+
+Primero levanta PostgreSQL con el Compose anterior. Identity necesita llaves RSA en DER/Base64. En cada servicio configura su host y base (`db_identity`, `db_parking`, `db_billing`), y habilita Flyway con el usuario migrador correspondiente antes del primer arranque (`IDENTITY_FLYWAY_ENABLED`, `PARKING_FLYWAY_ENABLED`, `BILLING_FLYWAY_ENABLED`). Mantén `ddl-auto=validate` y usa la cuenta `*_app` para ejecución normal.
+
+Desde PowerShell, ejecuta el wrapper de cada servicio:
+
+```powershell
+Set-Location services/parking-service; .\mvnw.cmd test
+Set-Location ../identity-service; .\mvnw.cmd test
+Set-Location ../parking-service; .\mvnw.cmd -f ..\billing-service\pom.xml test
 ```
-- `FINALIZADO` solo desde `/confirmar` (admin). Descuenta stock e inventario.
-- `CANCELADO` solo por admin mediante DELETE o PATCH estado.
 
-**Estados de pago:** `PENDIENTE` → `ANTICIPO` → `PARCIAL` → `COMPLETO`
+Para construir el frontend, abre una terminal desde `app/backend`:
 
-**Control de acceso:**
-- Cancelación de órdenes: Solo `ADMIN`
-- Confirmar servicio: Solo `ADMIN`
+```powershell
+Set-Location ..\frontend
+npm ci
+npm run dev
+```
 
----
+Configura `VITE_IDENTITY_URL`, `VITE_PARKING_URL` y `VITE_BILLING_URL` si las APIs no están en los puertos por defecto. CORS permite por defecto `localhost:5173` y `127.0.0.1:5173`; cambia `PARKFLOW_CORS_ALLOWED_ORIGINS` para otros orígenes.
 
-### 🛒 Ventas (POS / Mostrador)
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/ventas` | Todas las ventas |
-| GET | `/api/ventas/{id}` | Por ID |
-| GET | `/api/ventas/resumen` | Estadísticas rápidas |
-| POST | `/api/ventas` | Registrar venta (descuenta stock automáticamente) |
-| PATCH | `/api/ventas/{id}/estado?estado=CANCELADA` | Cambiar estado |
+## Funcionalidad disponible en esta versión
 
----
+- Identity: alta inicial de administrador, login JWT RS256, JWKS, consulta de identidad actual y control de roles.
+- Parking: gestión de pisos, zonas y espacios; asignación manual e ingreso; listado/búsqueda por placa; corrección auditada de placa; creación de liquidación en Billing y cierre recuperable con la misma clave idempotente.
+- Billing: tarifas e historial, cálculo de liquidaciones, cancelación de liquidaciones pendientes, cajas/sesiones de caja, pago en efectivo, movimientos y comprobantes.
+- Frontend: acceso, panel operativo, ingreso con selección de espacio, búsqueda por placa, apertura de caja y flujo de cobro/salida.
 
-### 🛍️ Compras a Proveedores
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/compras` | Todas las compras |
-| GET | `/api/compras/{id}` | Por ID |
-| GET | `/api/compras/proveedor/{proveedorId}` | Por proveedor |
-| POST | `/api/compras` | Crear orden de compra |
-| PUT | `/api/compras/{id}` | Actualizar |
-| PATCH | `/api/compras/{id}/estado?estado=CONFIRMADA` | Confirmar (sube stock) |
+Las salidas excepcionales, transferencias, mantenimiento, anulaciones, tiquete perdido, expediente completo de abandono, autorizaciones Identity y reconciliación automática aún requieren implementación. El recargo nocturno permanece sin aplicar hasta que se apruebe su regla. También está pendiente la decisión de si se exige pagar el cargo de abandono antes de entregar el vehículo.
 
----
+## Estructura
 
-### 📊 Movimientos de Inventario (Kardex)
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/movimientos-inventario` | Todos los movimientos |
-| GET | `/api/movimientos-inventario/recientes` | Últimos movimientos |
-| GET | `/api/movimientos-inventario/producto/{productoId}` | Por producto |
-| POST | `/api/movimientos-inventario/entrada` | Entrada manual (suma stock) |
-| POST | `/api/movimientos-inventario/salida` | Salida manual (resta stock) |
-
-> El trigger `fn_actualizar_stock()` en la BD mueve el stock automáticamente
-> al insertar en esta tabla. **Nunca** usar `UPDATE productos SET stock = ...` directamente.
-
----
-
-### 🎭 Roles
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/roles` | Todos los roles |
-| GET | `/api/roles/{id}` | Por ID |
-
-**Roles disponibles:** `ADMIN` · `TECNICO` · `INVENTARIO`
-
----
-
-## Reglas de negocio clave
-
-- **Stock:** Solo se mueve a través de `movimientos_inventario`. El trigger en BD lo aplica atómicamente. Si el stock es insuficiente, la BD lanza excepción y revierte toda la transacción.
-- **Historial:** `cliente_nombre` y `cliente_telefono` se guardan como snapshot en entregas y ventas para no perder datos históricos si el cliente cambia su información.
-- **Facturación:** Secuencias `FO-XXXX` (órdenes, borradores) y `FV-XXXX` (ventas oficiales). Definidas en BD con `NO CYCLE`.
-- **Passwords:** El seed tiene `123456` en texto plano. **Hashear con BCrypt antes de producción.**#   B A C K  
- #   B A C K  
- 
+- `services/parking-service`
+- `services/identity-service`
+- `services/billing-service`
+- `parkflow-db-definitivo/{parking,identity,billing}`: migraciones Flyway activas.
+- `parkflow-db-definitivo/docs`: arquitectura, datos, reglas, contratos y pendientes.
+- `docker-compose.parkflow.yml`: entorno local completo.
+- `../frontend`: aplicación React.
+- [Estado de implementación, validaciones y límites](PARKFLOW_IMPLEMENTATION_ROADMAP.md).

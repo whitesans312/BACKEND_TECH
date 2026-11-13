@@ -1,0 +1,66 @@
+package com.parkflow.security;
+
+import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+@Configuration
+@EnableMethodSecurity
+public class ParkflowSecurityConfiguration {
+    @Bean SecurityFilterChain parkingSecurityFilterChain(HttpSecurity http,Converter<Jwt,AbstractAuthenticationToken> rolesConverter)throws Exception{
+        http.csrf(AbstractHttpConfigurer::disable).cors(org.springframework.security.config.Customizer.withDefaults()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(a->a
+                .requestMatchers(HttpMethod.GET,"/api/v1/health").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/pisos/**","/api/v1/espacios/**","/api/zonas/**","/api/sesiones/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
+                .requestMatchers("/api/v1/pisos/**","/api/v1/espacios/**","/api/zonas/**").hasRole("ADMINISTRADOR")
+                .requestMatchers("/api/sesiones/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
+                .anyRequest().authenticated())
+            .oauth2ResourceServer(o->o.jwt(j->j.jwtAuthenticationConverter(rolesConverter)));
+        return http.build();
+    }
+
+    @Bean CorsConfigurationSource parkingCorsConfigurationSource(@Value("${parkflow.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}") String[] origins){
+        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(List.of(origins)); c.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+        c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key")); c.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource s=new UrlBasedCorsConfigurationSource(); s.registerCorsConfiguration("/**",c); return s;
+    }
+
+    @Bean Converter<Jwt,AbstractAuthenticationToken> parkingRolesConverter(){
+        return jwt->{List<String> roles=jwt.getClaimAsStringList("roles");
+            var authorities=roles==null?List.<SimpleGrantedAuthority>of():roles.stream().map(r->new SimpleGrantedAuthority("ROLE_"+r)).toList();
+            return new JwtAuthenticationToken(jwt,authorities,jwt.getSubject());};
+    }
+
+    @Bean JwtDecoder parkingJwtDecoder(@Value("${parkflow.security.jwt.jwk-set-uri}")String jwkUri,
+                                       @Value("${parkflow.security.jwt.issuer}")String issuer,
+                                       @Value("${parkflow.security.jwt.audience}")String audience){
+        NimbusJwtDecoder decoder=NimbusJwtDecoder.withJwkSetUri(jwkUri).jwsAlgorithm(SignatureAlgorithm.RS256).build();
+        OAuth2TokenValidator<Jwt> issuerValidator=JwtValidators.createDefaultWithIssuer(issuer);
+        OAuth2TokenValidator<Jwt> audienceValidator=jwt->jwt.getAudience().contains(audience)
+                ?org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success()
+                :org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(new org.springframework.security.oauth2.core.OAuth2Error("invalid_token","JWT audience mismatch.",null));
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuerValidator,audienceValidator));
+        return decoder;
+    }
+}
