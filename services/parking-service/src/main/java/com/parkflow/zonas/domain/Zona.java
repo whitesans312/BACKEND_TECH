@@ -27,4 +27,8 @@ public class Zona {
     public String getCodigo() { return codigo; }
     public String getNombre() { return nombre; }
     public boolean isActiva() { return activa; }
+    public void updateDetails(Piso piso, String codigo, String nombre) {
+        this.piso = piso; this.codigo = codigo; this.nombre = nombre;
+    }
+    public void setActiva(boolean activa) { this.activa = activa; }
 }

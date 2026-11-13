@@ -16,4 +16,6 @@ public class ZonaController {
         ZonaResponse z=service.crear(r); return ResponseEntity.created(URI.create("/api/zonas/"+z.id())).body(z);
     }
     @GetMapping public List<ZonaResponse> listar(@RequestParam(required=false) UUID pisoId) { return service.listar(pisoId); }
+    @PutMapping("/{id}") public ZonaResponse actualizar(@PathVariable UUID id, @Valid @RequestBody ZonaRequest request) { return service.actualizar(id, request); }
+    @PatchMapping("/{id}/habilitada") public ZonaResponse habilitar(@PathVariable UUID id, @Valid @RequestBody ZonaStatusRequest request) { return service.habilitar(id, request.habilitada()); }
 }

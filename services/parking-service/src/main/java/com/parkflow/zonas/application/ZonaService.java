@@ -26,4 +26,20 @@ public class ZonaService {
         List<Zona> result=pisoId==null?zonas.findAll():zonas.findByPiso_IdOrderByCodigo(pisoId);
         return result.stream().map(ZonaResponse::from).toList();
     }
+    @Transactional public ZonaResponse actualizar(UUID id, ZonaRequest r) {
+        Zona zona=zonas.findById(id).orElseThrow(()->new ResourceNotFoundException("No existe la zona solicitada."));
+        Piso piso=pisos.findById(r.pisoId()).orElseThrow(()->new ResourceNotFoundException("No existe el piso indicado."));
+        String codigo=r.codigo().trim();
+        if(zonas.existsByPiso_IdAndCodigoAndIdNot(r.pisoId(), codigo, id)) throw new ConflictException("Ya existe una zona con ese código en el piso.");
+        if(!zona.getPiso().getId().equals(r.pisoId()) && zonasRepositoryHasActiveSpaces(id)) throw new ConflictException("No se puede mover una zona con vehículos activos.");
+        zona.updateDetails(piso,codigo,r.nombre().trim());
+        return ZonaResponse.from(zonas.saveAndFlush(zona));
+    }
+    @Transactional public ZonaResponse habilitar(UUID id, boolean activa) {
+        Zona zona=zonas.findById(id).orElseThrow(()->new ResourceNotFoundException("No existe la zona solicitada."));
+        if(!activa && zonasRepositoryHasActiveSpaces(id)) throw new ConflictException("No se puede deshabilitar la zona: tiene vehículos activos.");
+        zona.setActiva(activa);
+        return ZonaResponse.from(zonas.saveAndFlush(zona));
+    }
+    private boolean zonasRepositoryHasActiveSpaces(UUID id) { return zonas.existsActiveSession(id); }
 }

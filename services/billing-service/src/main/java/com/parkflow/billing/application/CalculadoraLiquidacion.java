@@ -11,13 +11,27 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class CalculadoraLiquidacion {
     private static final ZoneId ZONA_NEGOCIO = ZoneId.of("America/Bogota");
-    private static final int MINUTOS_GRACIA = 15;
+    private final int minutosGracia;
     private static final int UMBRAL_DIARIO = 180;
+
+    @Autowired
+    public CalculadoraLiquidacion(@Value("${billing.parking.grace-minutes:15}") int minutosGracia) {
+        if (minutosGracia < 0 || minutosGracia > 1440) {
+            throw new IllegalArgumentException("Los minutos de gracia deben estar entre 0 y 1440.");
+        }
+        this.minutosGracia = minutosGracia;
+    }
+
+    CalculadoraLiquidacion() { this(15); }
+
+    public int minutosGracia() { return minutosGracia; }
 
     public CalculoLiquidacion calcular(Tarifa hora, Tarifa dia, Instant entrada, Instant corte) {
         if (corte.isBefore(entrada)) throw new UnprocessableOperationException("La fecha de corte no puede ser anterior a la entrada.");
@@ -25,16 +39,16 @@ public class CalculadoraLiquidacion {
         long elapsed = elapsedSeconds == 0 ? 0 : (elapsedSeconds + 59) / 60;
         if (elapsed > Integer.MAX_VALUE) throw new UnprocessableOperationException("La permanencia excede el rango soportado.");
         int minutes = (int) elapsed;
-        int chargeable = Math.max(0, minutes - MINUTOS_GRACIA);
+        int chargeable = Math.max(0, minutes - minutosGracia);
         if (chargeable == 0) return result(minutes, chargeable, 0, BigDecimal.ZERO, "TIEMPO_GRATIS", hora);
 
         if (chargeable <= UMBRAL_DIARIO) {
-            Instant billableStart = entrada.plusSeconds(MINUTOS_GRACIA * 60L);
+            Instant billableStart = entrada.plusSeconds(minutosGracia * 60L);
             int units = Math.toIntExact(hourlyBlocks(billableStart, corte));
             return result(minutes, chargeable, units, hora.getValor().multiply(BigDecimal.valueOf(units)), "COBRO_HORAS", hora);
         }
 
-        Instant billableStart = entrada.plusSeconds(MINUTOS_GRACIA * 60L);
+        Instant billableStart = entrada.plusSeconds(minutosGracia * 60L);
         long cycles = dailyCycles(billableStart, corte);
         return result(minutes, chargeable, Math.toIntExact(cycles), dia.getValor().multiply(BigDecimal.valueOf(cycles)), "TARIFA_DIARIA", dia);
     }

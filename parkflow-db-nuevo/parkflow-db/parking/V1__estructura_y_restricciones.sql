@@ -1,7 +1,7 @@
 -- ParkFlow / Parking Service / PostgreSQL
 CREATE TABLE pisos (
  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
- numero SMALLINT NOT NULL UNIQUE CHECK (numero > 0),
+ numero SMALLINT NOT NULL UNIQUE CHECK (numero >= -5),
  codigo VARCHAR(15) NOT NULL UNIQUE CHECK (btrim(codigo) <> ''),
  nombre VARCHAR(80) NOT NULL CHECK (btrim(nombre) <> ''),
  descripcion TEXT,

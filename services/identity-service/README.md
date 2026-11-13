@@ -4,7 +4,7 @@ Servicio independiente para usuarios, roles, autenticación y emisión de JWT. E
 
 ## Persistencia
 
-Las migraciones oficiales se mantienen en `../../parkflow-db/identity-service/src/main/resources/db/migration` y Maven las empaqueta en `db/migration`; no hay una copia de SQL en este servicio. Hibernate usa `ddl-auto=validate`. Flyway queda deshabilitado por defecto y puede habilitarse con `IDENTITY_FLYWAY_ENABLED=true` únicamente en el proceso de integración/preparación de base.
+Las migraciones oficiales se mantienen en `../../parkflow-db-definitivo/identity` y Maven las empaqueta en `db/migration`; no hay una copia de SQL en este servicio. Hibernate usa `ddl-auto=validate`. Flyway queda deshabilitado por defecto y puede habilitarse con `IDENTITY_FLYWAY_ENABLED=true` únicamente en el proceso de integración/preparación de base.
 
 V1 crea los roles `ADMINISTRADOR` y `OPERADOR`. El registro público crea usuarios `OPERADOR`; no acepta roles del solicitante. La asignación de `ADMINISTRADOR` solo está disponible para un administrador autenticado.
 

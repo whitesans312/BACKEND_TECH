@@ -7,6 +7,7 @@ public interface EspacioAvailabilityView {
 
     UUID getId();
     UUID getPisoId();
+    UUID getZonaId();
     String getPisoCodigo();
     String getCodigo();
     String getTipo();

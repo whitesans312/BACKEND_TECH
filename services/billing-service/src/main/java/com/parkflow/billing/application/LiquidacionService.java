@@ -92,7 +92,7 @@ public class LiquidacionService {
                 .orElseThrow(() -> new ConflictException("No hay tarifa diaria vigente."));
         CalculoLiquidacion calc=calculadora.calcular(hourly, daily, request.fechaEntrada(), request.fechaCorte());
         Liquidacion l=new Liquidacion(request.sesionId(), request.numeroTicket(), request.placa(), request.tipoVehiculo(),
-                request.fechaEntrada(), request.fechaCorte(), calc.minutos(), (short)15, calc.minutosFacturables(),
+                request.fechaEntrada(), request.fechaCorte(), calc.minutos(), (short)calculadora.minutosGracia(), calc.minutosFacturables(),
                 calc.total(), key, hash, operatorId);
         l=liquidaciones.saveAndFlush(l);
         detalles.saveAndFlush(new DetalleLiquidacion(l.getId(), calc.tarifaAplicada().getId(), calc.concepto(),

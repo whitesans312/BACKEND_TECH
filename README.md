@@ -10,7 +10,7 @@ ParkFlow está organizado como tres microservicios Spring Boot, cada uno con su 
 | React | 5173 | — |
 | PostgreSQL local de ParkFlow | 55433 | — |
 
-La arquitectura no usa claves foráneas entre bases. Los cambios de operación que cruzan servicios usan JWT e idempotencia. No ejecutes los SQL de `parkflow-db-nuevo` ni los modelos anteriores: la implementación activa está en `parkflow-db-definitivo/`.
+La arquitectura no usa claves foráneas entre bases. Los cambios de operación que cruzan servicios usan JWT e idempotencia. La implementación activa está en `parkflow-db-definitivo/`. La antigua `parkflow-db/` se retiró y se respaldó fuera del repositorio. `parkflow-db-nuevo/` se conserva como referencia; los servicios actuales no la cargan.
 
 ## Iniciar el entorno local con Docker
 
@@ -88,3 +88,4 @@ Las salidas excepcionales, transferencias, mantenimiento, anulaciones, tiquete p
 - `docker-compose.parkflow.yml`: entorno local completo.
 - `../frontend`: aplicación React.
 - [Estado de implementación, validaciones y límites](PARKFLOW_IMPLEMENTATION_ROADMAP.md).
+- [Guía paso a paso para instalar y ejecutar ParkFlow en otro computador](Como%20instalar%20y%20hacer%20funcionar%20el%20programa/README.md).

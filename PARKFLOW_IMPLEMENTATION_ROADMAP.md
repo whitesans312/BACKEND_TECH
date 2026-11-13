@@ -4,7 +4,7 @@
 
 ## Arquitectura activa
 
-ParkFlow tiene tres servicios Spring Boot independientes y tres bases PostgreSQL, sin claves foráneas entre bases. Las migraciones activas están en `parkflow-db-definitivo/`; `parkflow-db-nuevo/` se conserva como entrada histórica y no es la fuente que cargan los servicios.
+ParkFlow tiene tres servicios Spring Boot independientes y tres bases PostgreSQL, sin claves foráneas entre bases. Las migraciones activas están en `parkflow-db-definitivo/`. La carpeta antigua `parkflow-db/` se retiró; `parkflow-db-nuevo/` se conserva como referencia histórica y no es cargada por los servicios actuales.
 
 | Servicio | Estado implementado | Límites actuales |
 |---|---|---|

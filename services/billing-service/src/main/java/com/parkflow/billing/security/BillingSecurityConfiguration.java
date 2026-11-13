@@ -1,7 +1,9 @@
 package com.parkflow.billing.security;
 
 import java.util.List;
+import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -27,8 +29,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration @EnableMethodSecurity
 public class BillingSecurityConfiguration {
-    @Bean SecurityFilterChain billingSecurityFilterChain(HttpSecurity http,Converter<Jwt,AbstractAuthenticationToken> rolesConverter)throws Exception{
-        http.csrf(AbstractHttpConfigurer::disable).cors(org.springframework.security.config.Customizer.withDefaults()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    @Bean SecurityFilterChain billingSecurityFilterChain(HttpSecurity http,Converter<Jwt,AbstractAuthenticationToken> rolesConverter,@Qualifier("billingCorsConfigurationSource") CorsConfigurationSource cors)throws Exception{
+        http.csrf(AbstractHttpConfigurer::disable).cors(c->c.configurationSource(cors)).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a
                 .requestMatchers(HttpMethod.GET,"/api/billing/health").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/billing/tarifas/**","/api/billing/cajas/**","/api/billing/liquidaciones/**","/api/billing/pagos/**","/api/billing/comprobantes/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
@@ -40,8 +42,9 @@ public class BillingSecurityConfiguration {
             .oauth2ResourceServer(o->o.jwt(j->j.jwtAuthenticationConverter(rolesConverter)));
         return http.build();
     }
-    @Bean CorsConfigurationSource billingCorsConfigurationSource(@Value("${parkflow.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}") String[] origins){
-        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(List.of(origins)); c.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+    @Bean CorsConfigurationSource billingCorsConfigurationSource(@Value("${PARKFLOW_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}") String originsCsv){
+        List<String> origins=Arrays.stream(originsCsv.split(",")).map(String::trim).filter(origin->!origin.isEmpty()).toList();
+        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOriginPatterns(origins); c.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key")); c.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource s=new UrlBasedCorsConfigurationSource(); s.registerCorsConfiguration("/**",c); return s;
     }

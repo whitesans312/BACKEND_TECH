@@ -1,7 +1,9 @@
 package com.parkflow.security;
 
 import java.util.List;
+import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -28,10 +30,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableMethodSecurity
 public class ParkflowSecurityConfiguration {
-    @Bean SecurityFilterChain parkingSecurityFilterChain(HttpSecurity http,Converter<Jwt,AbstractAuthenticationToken> rolesConverter)throws Exception{
-        http.csrf(AbstractHttpConfigurer::disable).cors(org.springframework.security.config.Customizer.withDefaults()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    @Bean SecurityFilterChain parkingSecurityFilterChain(HttpSecurity http,Converter<Jwt,AbstractAuthenticationToken> rolesConverter,@Qualifier("parkingCorsConfigurationSource") CorsConfigurationSource cors)throws Exception{
+        http.csrf(AbstractHttpConfigurer::disable).cors(c->c.configurationSource(cors)).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a
                 .requestMatchers(HttpMethod.GET,"/api/v1/health").permitAll()
+                .requestMatchers("/api/v1/parqueadero/configuracion/**").hasRole("ADMINISTRADOR")
                 .requestMatchers(HttpMethod.GET,"/api/v1/pisos/**","/api/v1/espacios/**","/api/zonas/**","/api/sesiones/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
                 .requestMatchers("/api/v1/pisos/**","/api/v1/espacios/**","/api/zonas/**").hasRole("ADMINISTRADOR")
                 .requestMatchers("/api/sesiones/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
@@ -40,8 +43,9 @@ public class ParkflowSecurityConfiguration {
         return http.build();
     }
 
-    @Bean CorsConfigurationSource parkingCorsConfigurationSource(@Value("${parkflow.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}") String[] origins){
-        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(List.of(origins)); c.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+    @Bean CorsConfigurationSource parkingCorsConfigurationSource(@Value("${PARKFLOW_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}") String originsCsv){
+        List<String> origins=Arrays.stream(originsCsv.split(",")).map(String::trim).filter(origin->!origin.isEmpty()).toList();
+        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOriginPatterns(origins); c.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key")); c.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource s=new UrlBasedCorsConfigurationSource(); s.registerCorsConfiguration("/**",c); return s;
     }

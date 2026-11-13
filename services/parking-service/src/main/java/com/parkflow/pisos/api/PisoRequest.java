@@ -18,7 +18,7 @@ public record PisoRequest(
         String nombre,
 
         @NotNull
-        @Min(1)
+        @Min(-5)
         @Max(32767)
         Integer orden) {
 }

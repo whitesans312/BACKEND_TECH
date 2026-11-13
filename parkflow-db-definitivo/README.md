@@ -13,10 +13,11 @@ Este paquete contiene un modelo relacional nuevo y migraciones Flyway para `db_p
 5. [Comunicación entre servicios](docs/05_COMUNICACION_ENTRE_SERVICIOS.md)
 6. [Reglas de negocio](docs/06_REGLAS_DE_NEGOCIO.md)
 7. [Decisiones pendientes](docs/07_DECISIONES_PENDIENTES.md)
+8. [Modelo de bases de datos y microservicios](docs/10_MODELO_BASES_Y_MICROSERVICIOS.md)
 
 ## Estado vigente
 
-Este directorio es la fuente de migraciones empaquetada por los tres servicios. `parkflow-db-nuevo/` se conserva como material histórico y no debe ejecutarse junto con estas migraciones. Se validaron las versiones activas en PostgreSQL 16.15 temporal: Parking V1–V4, Identity V1–V3 y Billing V1–V4. Ver el [estado de implementación](../PARKFLOW_IMPLEMENTATION_ROADMAP.md) para alcance, pruebas y límites actuales.
+Este directorio es la única fuente de migraciones empaquetada por los tres servicios. La antigua carpeta `parkflow-db/` se retiró; `parkflow-db-nuevo/` se conserva como referencia, pero los servicios no la cargan. Se validaron las versiones activas en PostgreSQL 16.15 temporal: Parking V1–V4, Identity V1–V3 y Billing V1–V4. Ver el [estado de implementación](../PARKFLOW_IMPLEMENTATION_ROADMAP.md) para alcance, pruebas y límites actuales.
 
 ## Principios para la siguiente etapa
 

@@ -26,6 +26,7 @@ public interface EspacioRepository extends JpaRepository<Espacio, UUID> {
     @Query(value = """
             SELECT e.id AS "id",
                    p.id AS "pisoId",
+                   z.id AS "zonaId",
                    p.codigo AS "pisoCodigo",
                    e.codigo AS "codigo",
                    e.tipo_vehiculo AS "tipo",
@@ -46,6 +47,7 @@ public interface EspacioRepository extends JpaRepository<Espacio, UUID> {
     @Query(value = """
             SELECT e.id AS "id",
                    p.id AS "pisoId",
+                   z.id AS "zonaId",
                    p.codigo AS "pisoCodigo",
                    e.codigo AS "codigo",
                    e.tipo_vehiculo AS "tipo",

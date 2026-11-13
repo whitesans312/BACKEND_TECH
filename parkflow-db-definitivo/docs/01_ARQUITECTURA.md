@@ -38,7 +38,7 @@ No hay API Gateway en esta versión. El frontend usa URLs configurables y CORS; 
 
 ## Migraciones y versiones
 
-Fuente activa: `../parking`, `../identity` y `../billing`. Estado verificado en PostgreSQL 16.15 temporal: Parking V1–V4, Identity V1–V3, Billing V1–V4. La versión menor temporal fue 16.15. Los archivos de `parkflow-db-nuevo/` son históricos y no se cargan desde los POM actuales.
+Fuente activa: `../parking`, `../identity` y `../billing`. Estado verificado en PostgreSQL 16.15 temporal: Parking V1–V4, Identity V1–V3, Billing V1–V4. La versión menor temporal fue 16.15. La carpeta antigua `parkflow-db/` se retiró. `parkflow-db-nuevo/` permanece como referencia y no es un recurso de los POM actuales.
 
 El perfil normal usa Hibernate `ddl-auto=validate`; Flyway se habilita con credenciales migradoras en configuración explícita. El entorno Compose publica PostgreSQL en `55433` para no ocupar el puerto 5432 del equipo.
 

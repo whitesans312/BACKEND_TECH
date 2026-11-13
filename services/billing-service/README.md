@@ -4,7 +4,7 @@ Servicio Spring Boot independiente, propietario de tarifas, pagos y comprobantes
 
 ## Persistencia y seguridad local
 
-Las migraciones oficiales V1/V2 se mantienen únicamente en `../../parkflow-db/billing-service/src/main/resources/db/migration` y Maven las empaqueta como `db/migration`. Hibernate usa `ddl-auto=validate`; no crea ni actualiza tablas. Flyway permanece desactivado por defecto.
+Las migraciones oficiales se mantienen únicamente en `../../parkflow-db-definitivo/billing` y Maven las empaqueta como `db/migration`. Hibernate usa `ddl-auto=validate`; no crea ni actualiza tablas. Flyway permanece desactivado por defecto.
 
 La aplicación local escucha por defecto solo en `127.0.0.1:8083` y rechaza iniciar si la dirección se cambia a una interfaz no loopback. **La autenticación/autorización aún no está implementada**: los endpoints internos y administrativos son exclusivamente de desarrollo local y no deben exponerse a una red ni desplegarse. El `operadorId` recibido en solicitudes es un UUID de auditoría no verificado; no acredita identidad. Antes de producción se debe añadir identidad de servicio y validar JWT/roles, derivando al actor de un token validado.
 

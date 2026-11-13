@@ -19,13 +19,15 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
+import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 @Configuration
 public class SecurityConfiguration {
     @Bean PasswordEncoder passwordEncoder(){return new BCryptPasswordEncoder(12);}
-    @Bean SecurityFilterChain identityFilterChain(HttpSecurity http,AuthenticationEntryPoint entryPoint,AccessDeniedHandler deniedHandler,IdentityJwtAuthenticationConverter jwtConverter) throws Exception {
-        http.csrf(AbstractHttpConfigurer::disable).cors(org.springframework.security.config.Customizer.withDefaults())
+    @Bean SecurityFilterChain identityFilterChain(HttpSecurity http,AuthenticationEntryPoint entryPoint,AccessDeniedHandler deniedHandler,IdentityJwtAuthenticationConverter jwtConverter,@Qualifier("identityCorsConfigurationSource") CorsConfigurationSource cors) throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable).cors(c->c.configurationSource(cors))
             .sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a
                 .requestMatchers("/api/auth/register","/api/auth/login","/.well-known/jwks.json").permitAll()
@@ -36,8 +38,9 @@ public class SecurityConfiguration {
             .oauth2ResourceServer(o->o.jwt(j->j.jwtAuthenticationConverter(jwtConverter)));
         return http.build();
     }
-    @Bean CorsConfigurationSource identityCorsConfigurationSource(@Value("${parkflow.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}") String[] origins){
-        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOrigins(List.of(origins)); c.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+    @Bean CorsConfigurationSource identityCorsConfigurationSource(@Value("${PARKFLOW_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}") String originsCsv){
+        List<String> origins=Arrays.stream(originsCsv.split(",")).map(String::trim).filter(origin->!origin.isEmpty()).toList();
+        CorsConfiguration c=new CorsConfiguration(); c.setAllowedOriginPatterns(origins); c.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         c.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key")); c.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource s=new UrlBasedCorsConfigurationSource(); s.registerCorsConfiguration("/**",c); return s;
     }
