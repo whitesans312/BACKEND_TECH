@@ -2,6 +2,39 @@
 
 ParkFlow está organizado como tres microservicios Spring Boot, cada uno con su propia base PostgreSQL. El frontend React consume las APIs desde el navegador.
 
+## 📄 Documentación del proyecto
+
+Documento completo: [ParkFlow – Documentación Primer Avance](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0)
+
+- [Descripción del proyecto](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.5dyeicz075dh)
+  - [Contexto](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.h2n32raqdami)
+  - [Alcance](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.uqd6of5rmbtj)
+  - [Participantes](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.j4v5k63ja0ph)
+- [Backlog product](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.7hojlrflajdc) ([publicación en GitHub Projects](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.7u3cjq8r0qwy))
+  - [Épicas](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.46ylx2olzdr)
+  - [Historias de usuario](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.fduholtrks3f)
+  - [Criterios de aceptación en formato Gherkin](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.m2c3f4tx4k3r)
+  - [Historias técnicas](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.dwesvqwfk6o4)
+  - [Requerimientos no funcionales](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.ca632o5jlp7r)
+- [ADRs](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.j9172oknnomk)
+- [Job stories](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.t37x6tf2zzfy)
+- [JTBD](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.ttwo9exeuir0)
+- [Diagramas de secuencia (PlantUML)](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.hdmq2kageopz)
+- [Queries y Actions](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.21t1365d6v1)
+- [Proceso de event storming](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.xka7zhdbh7cc)
+  - Mostrar cada paso:
+    - [Paso 1: eventos de dominio](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.pxqyxzp3vnhw)
+    - [Paso 2: línea de tiempo del flujo principal](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.w6nfel223ap9)
+    - [Paso 3: comandos, actores, agregados y políticas](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.arbmgdcusj3w)
+    - [Paso 4: puntos calientes](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.3ka4r7ydrnpf)
+    - [Paso 5: bounded contexts](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.x08z6pbboyfu)
+    - [Paso 6: microservicios candidatos](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.dojmml2lpxm)
+  - [Identificar los Bounded Contexts](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.x08z6pbboyfu)
+  - [Identificar los microservicios candidatos](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.dojmml2lpxm)
+- [Modelado de datos](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.9iztubl1j4hq)
+- [Descubrir patrones de interacción](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.beuqx79qxkbt)
+- [Implementación de microservicios](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0#heading=h.ac2wwebsxeo8)
+
 | Componente | Puerto local | Base de datos |
 | --- | ---: | --- |
 | Identity | 8081 | `db_identity` |
