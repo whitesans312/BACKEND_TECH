@@ -2,6 +2,8 @@
 
 ParkFlow está organizado como tres microservicios Spring Boot, cada uno con su propia base PostgreSQL. El frontend React consume las APIs desde el navegador.
 
+Implementacion de Product Backlog: [Backlog Jira](https://miniproyecto2equipo2.atlassian.net/jira/core/projects/PRD/board?filter=&groupBy=none)
+
 ## 📄 Documentación del proyecto
 
 Documento completo: [ParkFlow – Documentación Primer Avance](https://docs.google.com/document/d/1Hee4QH_lmNgQn_M15HHNqPDRp9ksuIf6Ri2lyLOU-Vk/edit?tab=t.0)
