@@ -1,0 +1,27 @@
+server:
+  port: ${PORT:8081}
+  address: 0.0.0.0
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${IDENTITY_DB_HOST:postgres}:${IDENTITY_DB_PORT:5432}/${IDENTITY_DB_NAME:db_identity}
+    username: ${IDENTITY_DB_USERNAME:identity_app}
+    password: ${IDENTITY_DB_PASSWORD:identity_app_dev_only}
+  flyway:
+    enabled: ${IDENTITY_FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    clean-disabled: true
+    user: ${IDENTITY_DB_MIGRATION_USERNAME:identity_migrator}
+    password: ${IDENTITY_DB_MIGRATION_PASSWORD:identity_migrator_dev_only}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true

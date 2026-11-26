@@ -34,6 +34,9 @@ public interface EspacioRepository extends JpaRepository<Espacio, UUID> {
                    (p.activo AND z.activa) AS "pisoHabilitado",
                    EXISTS (SELECT 1 FROM sesiones_parqueo s
                            WHERE s.espacio_id = e.id AND s.estado = 'ACTIVA') AS "ocupado",
+                   EXISTS (SELECT 1 FROM reservas r
+                           WHERE r.espacio_id = e.id AND r.estado = 'ACTIVA'
+                             AND r.fecha_inicio <= now() AND r.fecha_fin > now()) AS "reservado",
                    e.creado_en AS "createdAt",
                    e.actualizado_en AS "updatedAt"
               FROM espacios e
@@ -55,6 +58,9 @@ public interface EspacioRepository extends JpaRepository<Espacio, UUID> {
                    (p.activo AND z.activa) AS "pisoHabilitado",
                    EXISTS (SELECT 1 FROM sesiones_parqueo s
                            WHERE s.espacio_id = e.id AND s.estado = 'ACTIVA') AS "ocupado",
+                   EXISTS (SELECT 1 FROM reservas r
+                           WHERE r.espacio_id = e.id AND r.estado = 'ACTIVA'
+                             AND r.fecha_inicio <= now() AND r.fecha_fin > now()) AS "reservado",
                    e.creado_en AS "createdAt",
                    e.actualizado_en AS "updatedAt"
               FROM espacios e
@@ -69,6 +75,13 @@ public interface EspacioRepository extends JpaRepository<Espacio, UUID> {
                            WHERE s.espacio_id = :espacioId AND s.estado = 'ACTIVA')
             """, nativeQuery = true)
     boolean existsActiveSession(@Param("espacioId") UUID espacioId);
+
+    @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM reservas r
+                           WHERE r.espacio_id = :espacioId AND r.estado = 'ACTIVA'
+                             AND r.fecha_inicio <= :ahora AND r.fecha_fin > :ahora)
+            """, nativeQuery = true)
+    boolean existsCurrentActiveReservation(@Param("espacioId") UUID espacioId, @Param("ahora") java.time.Instant ahora);
 
     @Query(value = """
             SELECT EXISTS (SELECT 1

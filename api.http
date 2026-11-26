@@ -1,0 +1,381 @@
+### ============================================================================
+### ParkFlow - Suite End-to-End vía Traefik Reverse Proxy (REST Client VS Code)
+### ============================================================================
+@baseUrl = http://localhost
+@adminEmail = admin@parkflow.local
+@adminPassword = CambiaEstaClave123
+
+### Claves de idempotencia fijas para probar reintentos determinísticos (HT-10)
+@entradaKey = 11111111-1111-4111-8111-111111111101
+@entradaDuplicadaKey = 11111111-1111-4111-8111-111111111199
+@salidaKey = 22222222-2222-4222-8222-222222222201
+@entradaMotoKey = 11111111-1111-4111-8111-111111111102
+@salidaMotoKey = 22222222-2222-4222-8222-222222222202
+@cajaKey = 33333333-3333-4333-8333-333333333301
+@reservaKey = 44444444-4444-4444-8444-444444444401
+@reservaSolapeKey = 44444444-4444-4444-8444-444444444499
+@checkInKey = 55555555-5555-4555-8555-555555555501
+@reservaCancelarKey = 44444444-4444-4444-8444-444444444402
+
+### ============================================================================
+### 1. HEALTH CHECKS (HT-07) & JWKS
+### ============================================================================
+
+### 1.1 Actuator Health - Identity Service (vía Traefik -> /actuator/health)
+GET {{baseUrl}}/health/identity
+
+### 1.2 Actuator Health - Parking Service (vía Traefik -> /actuator/health)
+GET {{baseUrl}}/health/parking
+
+### 1.3 Actuator Health - Billing Service (vía Traefik -> /actuator/health)
+GET {{baseUrl}}/health/billing
+
+### 1.4 Health Endpoint custom de Parking y Billing
+GET {{baseUrl}}/api/v1/health
+
+###
+GET {{baseUrl}}/api/billing/health
+
+### 1.5 Claves públicas JWKS RS256 de Identity
+GET {{baseUrl}}/.well-known/jwks.json
+
+### ============================================================================
+### 2. REGISTRO INICIAL (SOLO EN BD VACÍA) Y LOGIN
+### ============================================================================
+
+### 2.1 Registrar primer administrador (si aún no existe en db_identity)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "nombre": "Administrador ParkFlow",
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### 2.2 Login y captura automática del token JWT
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### Variable dinámica @token extraída del login
+@token = {{login.response.body.accessToken}}
+
+### 2.3 Verificar identidad actual (/api/auth/me)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### ============================================================================
+### 3. TOPOLOGÍA DEL PARQUEADERO (PISO, ZONA, ESPACIOS Y DISPONIBILIDAD)
+### ============================================================================
+
+### 3.1 Crear Piso (soporta sótanos desde -5 gracias a Parking V5)
+# @name crearPiso
+POST {{baseUrl}}/api/v1/pisos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "codigo": "P1",
+  "nombre": "Piso 1 Principal",
+  "orden": 1
+}
+
+###
+@pisoId = {{crearPiso.response.body.id}}
+
+### 3.2 Crear Zona en el Piso
+# @name crearZona
+POST {{baseUrl}}/api/zonas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pisoId": "{{pisoId}}",
+  "codigo": "Z-A",
+  "nombre": "Zona A Mixta",
+  "descripcion": "Zona principal cerca de acceso"
+}
+
+###
+@zonaId = {{crearZona.response.body.id}}
+
+### 3.3 Crear Espacio para CARRO
+# @name crearEspacioCarro
+POST {{baseUrl}}/api/v1/espacios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "zonaId": "{{zonaId}}",
+  "codigo": "C-01",
+  "tipo": "CARRO"
+}
+
+###
+@espacioId = {{crearEspacioCarro.response.body.id}}
+
+### 3.4 Crear Espacio para MOTO
+# @name crearEspacioMoto
+POST {{baseUrl}}/api/v1/espacios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "zonaId": "{{zonaId}}",
+  "codigo": "M-01",
+  "tipo": "MOTO"
+}
+
+###
+@espacioMotoId = {{crearEspacioMoto.response.body.id}}
+
+### 3.5 Consultar disponibilidad inicial (ambos disponibles = true, ocupado = false)
+GET {{baseUrl}}/api/v1/espacios?pisoId={{pisoId}}
+Authorization: Bearer {{token}}
+
+### ============================================================================
+### 4. ENTRADA CON IDEMPOTENCY-KEY + PRUEBA DE REINTENTO Y NO DUPLICIDAD (HT-10)
+### ============================================================================
+
+### 4.1 Registrar entrada de CARRO en espacio C-01
+# @name entradaCarro
+POST {{baseUrl}}/api/sesiones/entradas
+Authorization: Bearer {{token}}
+Idempotency-Key: {{entradaKey}}
+Content-Type: application/json
+
+{
+  "placa": "ABC123",
+  "tipoVehiculo": "CARRO",
+  "espacioId": "{{espacioId}}"
+}
+
+###
+@sesionId = {{entradaCarro.response.body.id}}
+@ticket = {{entradaCarro.response.body.numeroTicket}}
+
+### 4.2 REINTENTO con la MISMA Idempotency-Key (debe devolver el mismo tiquete sin duplicar sesión)
+POST {{baseUrl}}/api/sesiones/entradas
+Authorization: Bearer {{token}}
+Idempotency-Key: {{entradaKey}}
+Content-Type: application/json
+
+{
+  "placa": "ABC123",
+  "tipoVehiculo": "CARRO",
+  "espacioId": "{{espacioId}}"
+}
+
+### 4.3 Prueba de rechazo por placa activa duplicada con otra Idempotency-Key (espera 409 Conflict)
+POST {{baseUrl}}/api/sesiones/entradas
+Authorization: Bearer {{token}}
+Idempotency-Key: {{entradaDuplicadaKey}}
+Content-Type: application/json
+
+{
+  "placa": "ABC123",
+  "tipoVehiculo": "CARRO",
+  "espacioId": "{{espacioId}}"
+}
+
+### 4.4 Verificar que C-01 aparece ocupado = true, disponible = false
+GET {{baseUrl}}/api/v1/espacios?pisoId={{pisoId}}
+Authorization: Bearer {{token}}
+
+### ============================================================================
+### 5. SALIDA DENTRO DE PERIODO DE GRACIA (15 MIN -> GRATUITA) (HT-05)
+### ============================================================================
+
+### 5.1 Solicitar salida del CARRO (Parking invoca a Billing /internal/v1/liquidaciones -> GRATUITA)
+POST {{baseUrl}}/api/sesiones/{{ticket}}/salida
+Authorization: Bearer {{token}}
+Idempotency-Key: {{salidaKey}}
+
+### ============================================================================
+### 6. FLUJO COMPLETO DE COBRO: LIQUIDACIÓN + CAJA + PAGO EN EFECTIVO + CIERRE
+### ============================================================================
+
+### 6.1 Registrar entrada de MOTO en espacio M-01
+# @name entradaMoto
+POST {{baseUrl}}/api/sesiones/entradas
+Authorization: Bearer {{token}}
+Idempotency-Key: {{entradaMotoKey}}
+Content-Type: application/json
+
+{
+  "placa": "MOT99A",
+  "tipoVehiculo": "MOTO",
+  "espacioId": "{{espacioMotoId}}"
+}
+
+###
+@sesionMotoId = {{entradaMoto.response.body.id}}
+@ticketMoto = {{entradaMoto.response.body.numeroTicket}}
+
+### 6.2 Crear liquidación facturable en Billing (2h -> supera 15 min de gracia -> $7.000 COP, estado PENDIENTE)
+# @name crearLiquidacion
+POST {{baseUrl}}/internal/v1/liquidaciones
+Authorization: Bearer {{token}}
+Idempotency-Key: {{salidaMotoKey}}
+Content-Type: application/json
+
+{
+  "sesionId": "{{sesionMotoId}}",
+  "numeroTicket": "{{ticketMoto}}",
+  "tipoVehiculo": "MOTO",
+  "placa": "MOT99A",
+  "fechaEntrada": "2026-11-25T10:00:00Z",
+  "fechaCorte": "2026-11-25T12:00:00Z"
+}
+
+###
+@liquidacionId = {{crearLiquidacion.response.body.id}}
+@pagoId = {{crearLiquidacion.response.body.pago.id}}
+
+### 6.3 Crear Caja física en Billing
+# @name crearCaja
+POST {{baseUrl}}/api/billing/cajas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "codigo": "CAJA-01",
+  "nombre": "Caja Principal",
+  "descripcion": "Caja de recaudo en efectivo puerta principal"
+}
+
+###
+@cajaId = {{crearCaja.response.body.id}}
+
+### 6.4 Abrir sesión de caja con saldo inicial
+# @name abrirCaja
+POST {{baseUrl}}/api/billing/cajas/sesiones
+Authorization: Bearer {{token}}
+Idempotency-Key: {{cajaKey}}
+Content-Type: application/json
+
+{
+  "cajaId": "{{cajaId}}",
+  "saldoInicial": 100000.00,
+  "observacion": "Apertura de turno operativo"
+}
+
+###
+@sesionCajaId = {{abrirCaja.response.body.id}}
+
+### 6.5 Resolver pago en efectivo (aprueba pago, registra movimiento de caja y emite comprobante)
+POST {{baseUrl}}/internal/v1/pagos/{{pagoId}}/resolver
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "metodo": "EFECTIVO",
+  "sesionCajaId": "{{sesionCajaId}}"
+}
+
+### 6.6 Confirmar salida en Parking con la misma Idempotency-Key (cierra sesión y libera espacio M-01)
+POST {{baseUrl}}/api/sesiones/{{ticketMoto}}/salida
+Authorization: Bearer {{token}}
+Idempotency-Key: {{salidaMotoKey}}
+
+### 6.7 Consultar liquidación final en Billing (estado PAGADA + comprobante)
+GET {{baseUrl}}/internal/v1/liquidaciones/{{liquidacionId}}
+Authorization: Bearer {{token}}
+
+### 6.8 Verificar disponibilidad final de espacios (C-01 y M-01 nuevamente disponible = true)
+GET {{baseUrl}}/api/v1/espacios?pisoId={{pisoId}}
+Authorization: Bearer {{token}}
+
+### ============================================================================
+### 7. RESERVACIONES ANTICIPADAS (FLYWAY V6 + CHECK-IN + CANCELACIÓN)
+### ============================================================================
+
+### 7.1 Crear reservación anticipada de CARRO en C-01
+# @name crearReserva
+POST {{baseUrl}}/api/v1/reservas
+Authorization: Bearer {{token}}
+Idempotency-Key: {{reservaKey}}
+Content-Type: application/json
+
+{
+  "placa": "RES101",
+  "tipoVehiculo": "CARRO",
+  "espacioId": "{{espacioId}}",
+  "fechaInicio": "2026-11-26T14:00:00Z",
+  "fechaFin": "2026-11-26T18:00:00Z",
+  "observacion": "Reserva cliente frecuente"
+}
+
+###
+@reservaId = {{crearReserva.response.body.id}}
+
+### 7.2 Reintento idempotente de reserva (debe devolver la misma reserva sin duplicar)
+POST {{baseUrl}}/api/v1/reservas
+Authorization: Bearer {{token}}
+Idempotency-Key: {{reservaKey}}
+Content-Type: application/json
+
+{
+  "placa": "RES101",
+  "tipoVehiculo": "CARRO",
+  "espacioId": "{{espacioId}}",
+  "fechaInicio": "2026-11-26T14:00:00Z",
+  "fechaFin": "2026-11-26T18:00:00Z",
+  "observacion": "Reserva cliente frecuente"
+}
+
+### 7.3 Prueba de rechazo por cruce horario en el mismo espacio (espera 409 Conflict)
+POST {{baseUrl}}/api/v1/reservas
+Authorization: Bearer {{token}}
+Idempotency-Key: {{reservaSolapeKey}}
+Content-Type: application/json
+
+{
+  "placa": "RES202",
+  "tipoVehiculo": "CARRO",
+  "espacioId": "{{espacioId}}",
+  "fechaInicio": "2026-11-26T15:00:00Z",
+  "fechaFin": "2026-11-26T17:00:00Z"
+}
+
+### 7.4 Listar reservaciones activas
+GET {{baseUrl}}/api/v1/reservas?estado=ACTIVA
+Authorization: Bearer {{token}}
+
+### 7.5 Check-in de la reserva (convierte la reserva en sesión activa en C-01)
+POST {{baseUrl}}/api/v1/reservas/{{reservaId}}/check-in
+Authorization: Bearer {{token}}
+Idempotency-Key: {{checkInKey}}
+
+### 7.6 Crear segunda reserva (MOTO) y cancelarla
+# @name crearReservaMoto
+POST {{baseUrl}}/api/v1/reservas
+Authorization: Bearer {{token}}
+Idempotency-Key: {{reservaCancelarKey}}
+Content-Type: application/json
+
+{
+  "placa": "MOT77C",
+  "tipoVehiculo": "MOTO",
+  "espacioId": "{{espacioMotoId}}",
+  "fechaInicio": "2026-11-26T19:00:00Z",
+  "fechaFin": "2026-11-26T21:00:00Z"
+}
+
+###
+@reservaMotoId = {{crearReservaMoto.response.body.id}}
+
+### 7.7 Cancelar reserva
+PATCH {{baseUrl}}/api/v1/reservas/{{reservaMotoId}}/cancelar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "motivo": "El usuario reprogramó su visita"
+}

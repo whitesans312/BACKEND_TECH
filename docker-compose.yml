@@ -1,0 +1,227 @@
+name: parkflow
+
+services:
+  traefik:
+    image: traefik:v3
+    container_name: parkflow-traefik
+    restart: unless-stopped
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=parkflow-net
+      - --entrypoints.web.address=:80
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_DASHBOARD_PORT:-8090}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - parkflow-net
+
+  postgres:
+    image: postgres:16.15
+    container_name: parkflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PARKFLOW_PG_ADMIN_USER:-parkflow_admin}
+      POSTGRES_PASSWORD: ${PARKFLOW_PG_ADMIN_PASSWORD:-parkflow_admin_dev_only}
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "${PARKFLOW_PG_PORT:-55433}:5432"
+    volumes:
+      - parkflow_pg_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PARKFLOW_PG_ADMIN_USER:-parkflow_admin} -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - parkflow-net
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: services/identity-service/Dockerfile
+    container_name: parkflow-identity
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: .env.parkflow
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      PORT: 8081
+      IDENTITY_DB_HOST: postgres
+      IDENTITY_DB_PORT: 5432
+      IDENTITY_DB_NAME: db_identity
+      IDENTITY_DB_USERNAME: identity_app
+      IDENTITY_DB_PASSWORD: identity_app_dev_only
+      IDENTITY_FLYWAY_ENABLED: "true"
+      IDENTITY_DB_MIGRATION_USERNAME: identity_migrator
+      IDENTITY_DB_MIGRATION_PASSWORD: identity_migrator_dev_only
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-https://identity.parkflow.local}
+      IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-parkflow-api}
+      IDENTITY_JWT_TTL: ${IDENTITY_JWT_TTL:-PT8H}
+      PARKFLOW_CORS_ALLOWED_ORIGINS: ${PARKFLOW_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost,http://127.0.0.1}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 35s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=parkflow-net"
+      - "traefik.http.routers.identity.rule=PathPrefix(`/api/auth`) || PathPrefix(`/api/users`) || PathPrefix(`/api/roles`) || Path(`/.well-known/jwks.json`)"
+      - "traefik.http.routers.identity.entrypoints=web"
+      - "traefik.http.routers.identity.service=identity-svc"
+      - "traefik.http.services.identity-svc.loadbalancer.server.port=8081"
+      - "traefik.http.routers.identity-health.rule=Path(`/health/identity`)"
+      - "traefik.http.routers.identity-health.entrypoints=web"
+      - "traefik.http.routers.identity-health.middlewares=identity-health-replace"
+      - "traefik.http.routers.identity-health.service=identity-svc"
+      - "traefik.http.middlewares.identity-health-replace.replacepath.path=/actuator/health"
+    networks:
+      - parkflow-net
+
+  billing-service:
+    build:
+      context: .
+      dockerfile: services/billing-service/Dockerfile
+    container_name: parkflow-billing
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      PORT: 8083
+      BILLING_SERVER_ADDRESS: 0.0.0.0
+      BILLING_DB_HOST: postgres
+      BILLING_DB_PORT: 5432
+      BILLING_DB_NAME: db_billing
+      BILLING_DB_USERNAME: billing_app
+      BILLING_DB_PASSWORD: billing_app_dev_only
+      BILLING_FLYWAY_ENABLED: "true"
+      BILLING_DB_MIGRATION_USERNAME: billing_migrator
+      BILLING_DB_MIGRATION_PASSWORD: billing_migrator_dev_only
+      PARKFLOW_GRACE_MINUTES: ${PARKFLOW_GRACE_MINUTES:-15}
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-https://identity.parkflow.local}
+      IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-parkflow-api}
+      IDENTITY_JWKS_URI: http://identity-service:8081/.well-known/jwks.json
+      PARKFLOW_CORS_ALLOWED_ORIGINS: ${PARKFLOW_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost,http://127.0.0.1}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 35s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=parkflow-net"
+      - "traefik.http.routers.billing.rule=PathPrefix(`/api/billing`) || PathPrefix(`/internal/v1`)"
+      - "traefik.http.routers.billing.entrypoints=web"
+      - "traefik.http.routers.billing.service=billing-svc"
+      - "traefik.http.services.billing-svc.loadbalancer.server.port=8083"
+      - "traefik.http.routers.billing-health.rule=Path(`/health/billing`)"
+      - "traefik.http.routers.billing-health.entrypoints=web"
+      - "traefik.http.routers.billing-health.middlewares=billing-health-replace"
+      - "traefik.http.routers.billing-health.service=billing-svc"
+      - "traefik.http.middlewares.billing-health-replace.replacepath.path=/actuator/health"
+    networks:
+      - parkflow-net
+
+  parking-service:
+    build:
+      context: .
+      dockerfile: services/parking-service/Dockerfile
+    container_name: parkflow-parking
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      PORT: 8080
+      PARKING_SERVER_ADDRESS: 0.0.0.0
+      PARKING_DB_HOST: postgres
+      PARKING_DB_PORT: 5432
+      PARKING_DB_NAME: db_parking
+      PARKING_DB_USERNAME: parking_app
+      PARKING_DB_PASSWORD: parking_app_dev_only
+      PARKING_FLYWAY_ENABLED: "true"
+      PARKING_DB_MIGRATION_USERNAME: parking_migrator
+      PARKING_DB_MIGRATION_PASSWORD: parking_migrator_dev_only
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-https://identity.parkflow.local}
+      IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-parkflow-api}
+      IDENTITY_JWKS_URI: http://identity-service:8081/.well-known/jwks.json
+      BILLING_SERVICE_URL: http://billing-service:8083
+      PARKFLOW_CORS_ALLOWED_ORIGINS: ${PARKFLOW_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost,http://127.0.0.1}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 35s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=parkflow-net"
+      - "traefik.http.routers.parking.rule=PathPrefix(`/api/v1/parqueadero`) || PathPrefix(`/api/v1/pisos`) || PathPrefix(`/api/zonas`) || PathPrefix(`/api/v1/espacios`) || PathPrefix(`/api/v1/reservas`) || PathPrefix(`/api/sesiones`) || Path(`/api/v1/health`)"
+      - "traefik.http.routers.parking.entrypoints=web"
+      - "traefik.http.routers.parking.service=parking-svc"
+      - "traefik.http.services.parking-svc.loadbalancer.server.port=8080"
+      - "traefik.http.routers.parking-health.rule=Path(`/health/parking`)"
+      - "traefik.http.routers.parking-health.entrypoints=web"
+      - "traefik.http.routers.parking-health.middlewares=parking-health-replace"
+      - "traefik.http.routers.parking-health.service=parking-svc"
+      - "traefik.http.middlewares.parking-health-replace.replacepath.path=/actuator/health"
+    networks:
+      - parkflow-net
+
+  frontend:
+    build:
+      context: ../FRONT_TECH
+      dockerfile: Dockerfile
+      args:
+        VITE_IDENTITY_URL: ${VITE_IDENTITY_URL:-http://localhost}
+        VITE_PARKING_URL: ${VITE_PARKING_URL:-http://localhost}
+        VITE_BILLING_URL: ${VITE_BILLING_URL:-http://localhost}
+    container_name: parkflow-frontend
+    restart: unless-stopped
+    depends_on:
+      identity-service:
+        condition: service_healthy
+      parking-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    ports:
+      - "${FRONTEND_HTTP_PORT:-5173}:80"
+    networks:
+      - parkflow-net
+
+networks:
+  parkflow-net:
+    name: parkflow-net
+    driver: bridge
+
+volumes:
+  parkflow_pg_data:

@@ -30,7 +30,7 @@ public class SecurityConfiguration {
         http.csrf(AbstractHttpConfigurer::disable).cors(c->c.configurationSource(cors))
             .sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a
-                .requestMatchers("/api/auth/register","/api/auth/login","/.well-known/jwks.json").permitAll()
+                .requestMatchers("/api/auth/register","/api/auth/login","/.well-known/jwks.json","/actuator/health","/actuator/health/**").permitAll()
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers("/api/users/**","/api/roles/**").hasRole("ADMINISTRADOR")
                 .anyRequest().denyAll())

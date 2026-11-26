@@ -32,7 +32,7 @@ public class BillingSecurityConfiguration {
     @Bean SecurityFilterChain billingSecurityFilterChain(HttpSecurity http,Converter<Jwt,AbstractAuthenticationToken> rolesConverter,@Qualifier("billingCorsConfigurationSource") CorsConfigurationSource cors)throws Exception{
         http.csrf(AbstractHttpConfigurer::disable).cors(c->c.configurationSource(cors)).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a
-                .requestMatchers(HttpMethod.GET,"/api/billing/health").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/billing/health","/actuator/health","/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/billing/tarifas/**","/api/billing/cajas/**","/api/billing/liquidaciones/**","/api/billing/pagos/**","/api/billing/comprobantes/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
                 .requestMatchers(HttpMethod.PUT,"/api/billing/tarifas/**").hasRole("ADMINISTRADOR")
                 .requestMatchers(HttpMethod.POST,"/api/billing/tarifas/**","/api/billing/cajas").hasRole("ADMINISTRADOR")

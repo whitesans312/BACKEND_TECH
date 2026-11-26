@@ -21,7 +21,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
+
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @ExtendWith(MockitoExtension.class)
 class SesionServiceTest {
@@ -73,5 +82,33 @@ class SesionServiceTest {
         assertThat(response.placa()).isEqualTo("ABC123");
         assertThat(response.numeroTicket()).matches("PF-[0-9]{4}-000042");
         verify(espacios).findByIdForUpdate(spaceId);
+    }
+
+    @Test void solicitarSalidaDoesNotLockRowBeforeBillingHttpCallWhenPending() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://billing-service:8083");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        SesionService salidaService = new SesionService(sesiones, espacios, jdbc, builder, null);
+
+        UUID spaceId = UUID.randomUUID();
+        UUID opId = UUID.randomUUID();
+        UUID settlementId = UUID.randomUUID();
+        Espacio space = mock(Espacio.class);
+        when(space.getId()).thenReturn(spaceId);
+        when(space.getCodigo()).thenReturn("C-01");
+        SesionParqueo session = new SesionParqueo("PF-2026-000099", "XYZ987", TipoEspacio.CARRO, space, UUID.randomUUID());
+        when(sesiones.findByNumeroTicket("PF-2026-000099")).thenReturn(Optional.of(session));
+
+        server.expect(requestTo("http://billing-service:8083/internal/v1/liquidaciones/by-idempotency-key/" + opId))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"id\":\"" + settlementId + "\",\"estado\":\"PENDIENTE\",\"total\":6000.00}", MediaType.APPLICATION_JSON));
+
+        Jwt jwt = Jwt.withTokenValue("jwt-token").header("alg", "RS256").subject(UUID.randomUUID().toString()).build();
+        var result = salidaService.solicitarSalida("PF-2026-000099", opId, jwt);
+
+        assertThat(result.salidaConfirmada()).isFalse();
+        assertThat(result.estadoLiquidacion()).isEqualTo("PENDIENTE");
+        verify(sesiones).findByNumeroTicket("PF-2026-000099");
+        verify(sesiones, never()).findByNumeroTicketForUpdate(any());
+        server.verify();
     }
 }

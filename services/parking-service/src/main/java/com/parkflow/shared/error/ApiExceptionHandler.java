@@ -15,6 +15,7 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -67,6 +68,17 @@ public class ApiExceptionHandler {
     ProblemDetail handleMissingParameter(MissingServletRequestParameterException exception) {
         return problem(HttpStatus.BAD_REQUEST, "Parámetro requerido",
                 "Falta un parámetro requerido en la solicitud.");
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    ProblemDetail handleMissingHeader(MissingRequestHeaderException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "Encabezado requerido",
+                "Falta un encabezado obligatorio en la solicitud.");
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    ProblemDetail handleIllegalArgument(IllegalArgumentException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "Solicitud inválida", exception.getMessage());
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

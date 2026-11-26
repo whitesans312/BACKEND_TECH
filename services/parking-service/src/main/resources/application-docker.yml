@@ -1,0 +1,36 @@
+server:
+  port: ${PORT:8080}
+  address: ${PARKING_SERVER_ADDRESS:0.0.0.0}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${PARKING_DB_HOST:postgres}:${PARKING_DB_PORT:5432}/${PARKING_DB_NAME:db_parking}
+    username: ${PARKING_DB_USERNAME:parking_app}
+    password: ${PARKING_DB_PASSWORD:parking_app_dev_only}
+  flyway:
+    enabled: ${PARKING_FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    clean-disabled: true
+    user: ${PARKING_DB_MIGRATION_USERNAME:parking_migrator}
+    password: ${PARKING_DB_MIGRATION_PASSWORD:parking_migrator_dev_only}
+
+parkflow:
+  security:
+    jwt:
+      issuer: ${IDENTITY_JWT_ISSUER:https://identity.parkflow.local}
+      audience: ${IDENTITY_JWT_AUDIENCE:parkflow-api}
+      jwk-set-uri: ${IDENTITY_JWKS_URI:http://identity-service:8081/.well-known/jwks.json}
+  billing:
+    base-url: ${BILLING_SERVICE_URL:http://billing-service:8083}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true

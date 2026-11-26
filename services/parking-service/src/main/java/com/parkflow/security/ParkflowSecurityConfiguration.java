@@ -33,11 +33,11 @@ public class ParkflowSecurityConfiguration {
     @Bean SecurityFilterChain parkingSecurityFilterChain(HttpSecurity http,Converter<Jwt,AbstractAuthenticationToken> rolesConverter,@Qualifier("parkingCorsConfigurationSource") CorsConfigurationSource cors)throws Exception{
         http.csrf(AbstractHttpConfigurer::disable).cors(c->c.configurationSource(cors)).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a
-                .requestMatchers(HttpMethod.GET,"/api/v1/health").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/v1/health","/actuator/health","/actuator/health/**").permitAll()
                 .requestMatchers("/api/v1/parqueadero/configuracion/**").hasRole("ADMINISTRADOR")
-                .requestMatchers(HttpMethod.GET,"/api/v1/pisos/**","/api/v1/espacios/**","/api/zonas/**","/api/sesiones/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
+                .requestMatchers(HttpMethod.GET,"/api/v1/pisos/**","/api/v1/espacios/**","/api/zonas/**","/api/sesiones/**","/api/v1/reservas/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
                 .requestMatchers("/api/v1/pisos/**","/api/v1/espacios/**","/api/zonas/**").hasRole("ADMINISTRADOR")
-                .requestMatchers("/api/sesiones/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
+                .requestMatchers("/api/sesiones/**","/api/v1/reservas/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
                 .anyRequest().authenticated())
             .oauth2ResourceServer(o->o.jwt(j->j.jwtAuthenticationConverter(rolesConverter)));
         return http.build();

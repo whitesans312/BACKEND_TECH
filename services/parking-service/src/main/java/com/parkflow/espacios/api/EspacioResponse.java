@@ -15,19 +15,25 @@ public record EspacioResponse(
         TipoEspacio tipo,
         boolean habilitado,
         boolean ocupado,
+        boolean reservado,
         boolean disponible,
         Instant createdAt,
         Instant updatedAt) {
 
+    public EspacioResponse(UUID id, UUID pisoId, UUID zonaId, String pisoCodigo, String codigo, TipoEspacio tipo,
+            boolean habilitado, boolean ocupado, boolean disponible, Instant createdAt, Instant updatedAt) {
+        this(id, pisoId, zonaId, pisoCodigo, codigo, tipo, habilitado, ocupado, false, disponible, createdAt, updatedAt);
+    }
+
     public EspacioResponse(UUID id, UUID pisoId, String pisoCodigo, String codigo, TipoEspacio tipo,
             boolean habilitado, boolean ocupado, boolean disponible, Instant createdAt, Instant updatedAt) {
-        this(id, pisoId, null, pisoCodigo, codigo, tipo, habilitado, ocupado, disponible, createdAt, updatedAt);
+        this(id, pisoId, null, pisoCodigo, codigo, tipo, habilitado, ocupado, false, disponible, createdAt, updatedAt);
     }
 
     public static EspacioResponse from(EspacioAvailabilityView view) {
         TipoEspacio type = TipoEspacio.valueOf(view.getTipo());
-        boolean available = view.getHabilitado() && view.getPisoHabilitado() && !view.getOcupado();
+        boolean available = view.getHabilitado() && view.getPisoHabilitado() && !view.getOcupado() && !view.getReservado();
         return new EspacioResponse(view.getId(), view.getPisoId(), view.getZonaId(), view.getPisoCodigo(), view.getCodigo(), type,
-                view.getHabilitado(), view.getOcupado(), available, view.getCreatedAt(), view.getUpdatedAt());
+                view.getHabilitado(), view.getOcupado(), view.getReservado(), available, view.getCreatedAt(), view.getUpdatedAt());
     }
 }
