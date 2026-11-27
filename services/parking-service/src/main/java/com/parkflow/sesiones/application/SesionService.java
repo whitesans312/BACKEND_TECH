@@ -5,10 +5,12 @@ import com.parkflow.espacios.domain.TipoEspacio;
 import com.parkflow.espacios.infrastructure.EspacioRepository;
 import com.parkflow.shared.error.ConflictException;
 import com.parkflow.shared.error.ResourceNotFoundException;
+import com.parkflow.sesiones.api.AnulacionRequest;
 import com.parkflow.sesiones.api.CorreccionPlacaRequest;
 import com.parkflow.sesiones.api.EntradaRequest;
 import com.parkflow.sesiones.api.SalidaResponse;
 import com.parkflow.sesiones.api.SesionResponse;
+import com.parkflow.sesiones.api.TrasladoRequest;
 import com.parkflow.sesiones.domain.EstadoSesion;
 import com.parkflow.sesiones.domain.SesionParqueo;
 import com.parkflow.sesiones.infrastructure.SesionParqueoRepository;
@@ -104,6 +106,9 @@ public class SesionService {
         if (espacio.getTipo() != request.tipoVehiculo()) {
             throw new ConflictException("El tipo de vehículo no es compatible con el espacio.");
         }
+        if (espacio.isEnMantenimiento()) {
+            throw new ConflictException("El espacio está en mantenimiento.");
+        }
         if (!espacio.isHabilitado() || !espacio.getZona().isActiva() || !espacio.getZona().getPiso().isHabilitado()) {
             throw new ConflictException("El espacio, la zona o el piso no están habilitados.");
         }
@@ -167,6 +172,126 @@ public class SesionService {
             throw new ConflictException("La placa ya está asociada a otra sesión activa.");
         }
         session.corregirPlaca(newPlate);
+        return SesionResponse.from(sesiones.saveAndFlush(session));
+    }
+
+    /**
+     * Anula una sesión ACTIVA (solo ADMINISTRADOR; la regla está en ParkflowSecurityConfiguration).
+     * Registra la anulación en anulaciones_sesion, deja auditoría en eventos_operativos y libera el espacio.
+     * Es idempotente: repetir la petición con la misma Idempotency-Key devuelve la misma sesión anulada.
+     */
+    @Transactional
+    public SesionResponse anular(String ticket, UUID operationId, UUID administradorId, AnulacionRequest request) {
+        SesionParqueo session = sesiones.findByNumeroTicketForUpdate(ticket)
+                .orElseThrow(() -> new ResourceNotFoundException("No existe el ticket solicitado."));
+
+        List<UUID> previa = jdbc.queryForList(
+                "SELECT sesion_id FROM anulaciones_sesion WHERE clave_idempotencia = ?", UUID.class, operationId);
+        if (!previa.isEmpty()) {
+            if (!previa.get(0).equals(session.getId())) {
+                throw new ConflictException("La clave de idempotencia ya fue usada para anular otra sesión.");
+            }
+            return SesionResponse.from(session);
+        }
+        if (session.getEstado() == EstadoSesion.ANULADA) {
+            throw new ConflictException("La sesión ya fue anulada.");
+        }
+        if (session.getEstado() != EstadoSesion.ACTIVA) {
+            throw new ConflictException("Solo se puede anular una sesión activa; esta sesión ya fue cerrada.");
+        }
+
+        String motivo = request.motivo().trim();
+        jdbc.update("""
+                INSERT INTO anulaciones_sesion(sesion_id, administrador_id, motivo, clave_idempotencia)
+                VALUES (?, ?, ?, ?)
+                """, session.getId(), administradorId, motivo, operationId);
+        jdbc.update("""
+                INSERT INTO eventos_operativos(sesion_id, operador_id, tipo_evento, motivo, datos_anteriores, datos_nuevos)
+                VALUES (?, ?, 'ANULACION_SESION', ?,
+                        jsonb_build_object('estado', 'ACTIVA', 'espacio', ?::text),
+                        jsonb_build_object('estado', 'ANULADA'))
+                """, session.getId(), administradorId, motivo, session.getEspacio().getCodigo());
+
+        session.anular();
+        return SesionResponse.from(sesiones.saveAndFlush(session));
+    }
+
+    /**
+     * Traslada un vehículo activo a otro espacio (ADMINISTRADOR u OPERADOR).
+     * Bloquea la sesión y ambos espacios (en orden fijo por id para evitar deadlocks), valida que el
+     * destino sea del mismo tipo, esté habilitado, libre, sin mantenimiento ni reserva vigente,
+     * y registra el movimiento en traslados_espacio y eventos_operativos.
+     * Es idempotente: la Idempotency-Key se guarda en eventos_operativos.
+     */
+    @Transactional
+    public SesionResponse trasladar(String ticket, UUID operationId, UUID operadorId, TrasladoRequest request) {
+        SesionParqueo session = sesiones.findByNumeroTicketForUpdate(ticket)
+                .orElseThrow(() -> new ResourceNotFoundException("No existe el ticket solicitado."));
+
+        List<java.util.Map<String, Object>> previo = jdbc.queryForList("""
+                SELECT sesion_id, tipo_evento, datos_nuevos->>'espacioId' AS destino
+                  FROM eventos_operativos WHERE clave_idempotencia = ?
+                """, operationId);
+        if (!previo.isEmpty()) {
+            var evento = previo.get(0);
+            boolean mismaOperacion = "TRASLADO_ESPACIO".equals(evento.get("tipo_evento"))
+                    && session.getId().equals(evento.get("sesion_id"))
+                    && request.espacioDestinoId().toString().equals(evento.get("destino"));
+            if (!mismaOperacion) {
+                throw new ConflictException("La clave de idempotencia ya fue usada por otra operación.");
+            }
+            return SesionResponse.from(session);
+        }
+
+        if (session.getEstado() != EstadoSesion.ACTIVA) {
+            throw new ConflictException("Solo se puede trasladar un vehículo con sesión activa.");
+        }
+        UUID origenId = session.getEspacio().getId();
+        UUID destinoId = request.espacioDestinoId();
+        if (origenId.equals(destinoId)) {
+            throw new IllegalArgumentException("El espacio de destino debe ser diferente al actual.");
+        }
+
+        // Orden fijo de bloqueo: dos traslados cruzados (A->B y B->A) no se bloquean mutuamente.
+        UUID primero = origenId.compareTo(destinoId) < 0 ? origenId : destinoId;
+        UUID segundo = primero.equals(origenId) ? destinoId : origenId;
+        Espacio bloqueado1 = espacios.findByIdForUpdate(primero)
+                .orElseThrow(() -> new ResourceNotFoundException("No existe el espacio solicitado."));
+        Espacio bloqueado2 = espacios.findByIdForUpdate(segundo)
+                .orElseThrow(() -> new ResourceNotFoundException("No existe el espacio de destino."));
+        Espacio origen = bloqueado1.getId().equals(origenId) ? bloqueado1 : bloqueado2;
+        Espacio destino = bloqueado1.getId().equals(destinoId) ? bloqueado1 : bloqueado2;
+
+        if (destino.getTipo() != session.getTipoVehiculo()) {
+            throw new ConflictException("El espacio de destino no es compatible con el tipo de vehículo.");
+        }
+        if (destino.isEnMantenimiento()) {
+            throw new ConflictException("El espacio de destino está en mantenimiento.");
+        }
+        if (!destino.isHabilitado() || !destino.getZona().isActiva() || !destino.getZona().getPiso().isHabilitado()) {
+            throw new ConflictException("El espacio de destino, su zona o su piso no están habilitados.");
+        }
+        if (espacios.existsActiveSession(destinoId)) {
+            throw new ConflictException("El espacio de destino ya tiene un vehículo activo.");
+        }
+        if (espacios.existsCurrentActiveReservation(destinoId, Instant.now())) {
+            throw new ConflictException("El espacio de destino tiene una reserva vigente en este horario.");
+        }
+
+        String motivo = request.motivo().trim();
+        jdbc.update("""
+                INSERT INTO traslados_espacio(sesion_id, espacio_origen_id, espacio_destino_id, operador_id, motivo)
+                VALUES (?, ?, ?, ?, ?)
+                """, session.getId(), origenId, destinoId, operadorId, motivo);
+        jdbc.update("""
+                INSERT INTO eventos_operativos(sesion_id, operador_id, tipo_evento, motivo, datos_anteriores, datos_nuevos, clave_idempotencia)
+                VALUES (?, ?, 'TRASLADO_ESPACIO', ?,
+                        jsonb_build_object('espacioId', ?::text, 'espacio', ?::text),
+                        jsonb_build_object('espacioId', ?::text, 'espacio', ?::text), ?)
+                """, session.getId(), operadorId, motivo,
+                origenId.toString(), origen.getCodigo(), destinoId.toString(), destino.getCodigo(), operationId);
+
+        session.trasladarA(destino);
         return SesionResponse.from(sesiones.saveAndFlush(session));
     }
 

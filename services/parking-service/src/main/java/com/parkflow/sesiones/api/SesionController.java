@@ -22,6 +22,16 @@ public class SesionController {
         var result=service.solicitarSalida(ticket,operationId,jwt);
         return ResponseEntity.status(result.salidaConfirmada()?200:202).body(result);
     }
+    @PostMapping("/{ticket}/anular") public SesionResponse anular(@PathVariable String ticket,
+            @RequestHeader("Idempotency-Key") UUID operationId,@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody AnulacionRequest request){
+        return service.anular(ticket,operationId,UUID.fromString(jwt.getSubject()),request);
+    }
+    @PostMapping("/{ticket}/traslado") public SesionResponse trasladar(@PathVariable String ticket,
+            @RequestHeader("Idempotency-Key") UUID operationId,@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody TrasladoRequest request){
+        return service.trasladar(ticket,operationId,UUID.fromString(jwt.getSubject()),request);
+    }
     @GetMapping("/buscar-placa") public List<SesionResponse> buscarPlaca(@RequestParam String placa){return service.buscarPorPlaca(placa);}
     @PutMapping("/{ticket}/placa") public SesionResponse corregirPlaca(@PathVariable String ticket,
             @RequestHeader("Idempotency-Key") UUID operationId,@AuthenticationPrincipal Jwt jwt,
