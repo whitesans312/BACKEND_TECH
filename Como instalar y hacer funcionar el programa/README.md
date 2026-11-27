@@ -27,12 +27,12 @@ ParkFlow está dividido en dos repositorios: backend (`BACKEND_TECH`) y frontend
 ```powershell
 $projectRoot = Join-Path $HOME 'Documents\ParkFlow\app'
 New-Item -ItemType Directory -Path $projectRoot -Force | Out-Null
-git clone https://github.com/whitesans312/BACKEND_TECH.git (Join-Path $projectRoot 'backend')
+git clone https://github.com/whitesans312/BACKEND_TECH.git (Join-Path $projectRoot 'BACKEND_TECH')
 git clone https://github.com/whitesans312/FRONT_TECH.git (Join-Path $projectRoot 'FRONT_TECH')
-Set-Location (Join-Path $projectRoot 'backend')
+Set-Location (Join-Path $projectRoot 'BACKEND_TECH')
 ```
 
-Si GitHub solicita autenticación, el usuario debe tener acceso a los repositorios. También se pueden descargar ambos como ZIP, pero deben extraerse como carpetas `backend` y `FRONT_TECH` dentro del mismo directorio `app`.
+Si GitHub solicita autenticación, el usuario debe tener acceso a los repositorios. También se pueden descargar ambos como ZIP, pero deben extraerse como carpetas `BACKEND_TECH` y `FRONT_TECH` dentro del mismo directorio `app`.
 
 Confirma que estás en la carpeta correcta:
 
@@ -61,7 +61,7 @@ El script guarda las llaves codificadas en `.env.parkflow`. Ese archivo es local
 
 ## 4. Iniciar ParkFlow
 
-Desde `app\backend`, ejecuta:
+Desde `app\BACKEND_TECH`, ejecuta:
 
 ```powershell
 docker compose --env-file .env.parkflow -f .\docker-compose.parkflow.yml up --build -d
@@ -136,7 +136,7 @@ El proyecto incluye dos archivos Compose (`docker-compose.parkflow.yml` y `docke
 
 ## 8. Solución de problemas comunes
 
-**Docker dice que no encuentra `.env.parkflow`.** Ejecuta los comandos desde `app\backend`, y confirma que creaste el archivo con `Copy-Item`.
+**Docker dice que no encuentra `.env.parkflow`.** Ejecuta los comandos desde `app\BACKEND_TECH`, y confirma que creaste el archivo con `Copy-Item`.
 
 **Docker no puede conectar con el daemon.** Abre Docker Desktop y espera a que termine de iniciar. Comprueba con `docker info`.
 

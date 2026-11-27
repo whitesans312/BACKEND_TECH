@@ -10,7 +10,7 @@ Las verificaciones de esta implementación se ejecutaron en un clúster PostgreS
 
 ## Iniciar el entorno local
 
-Desde `app/backend`:
+Desde `app/BACKEND_TECH`:
 
 1. Copia `.env.parkflow.example` a `.env.parkflow`.
 2. Genera claves RS256 de desarrollo:

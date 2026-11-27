@@ -53,7 +53,7 @@ Requisitos: Docker Desktop con Compose v2 y Java 21/Maven solo si vas a ejecutar
 
 1. Copia `.env.parkflow.example` a `.env.parkflow`.
 2. Genera las llaves RSA con `powershell -ExecutionPolicy Bypass -File .\scripts\New-ParkFlowJwtKeys.ps1`. El script guarda la llave privada PKCS#8 y la llave pública DER en Base64 dentro de `.env.parkflow`, elimina los temporales y no imprime los valores. Mantén ese archivo privado y fuera de Git.
-3. Desde `backend`, inicia el stack:
+3. Desde `BACKEND_TECH`, inicia el stack:
 
 ```powershell
 docker compose --env-file .env.parkflow -f docker-compose.parkflow.yml up --build
@@ -94,7 +94,7 @@ Set-Location ../identity-service; .\mvnw.cmd test
 Set-Location ../parking-service; .\mvnw.cmd -f ..\billing-service\pom.xml test
 ```
 
-Para construir el frontend, abre una terminal desde `app/backend`:
+Para construir el frontend, abre una terminal desde `app/BACKEND_TECH`:
 
 ```powershell
 Set-Location ..\FRONT_TECH

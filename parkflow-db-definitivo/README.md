@@ -27,7 +27,7 @@ Una base por servicio; usuarios PostgreSQL distintos; sin FK entre bases; migrac
 
 Las migraciones se comprobaron en PostgreSQL **16.15** sobre un clúster temporal. La instancia existente del usuario en puerto `5432` no se modificó. El Compose de ParkFlow usa `55433` para desarrollo y el esquema de instalación está documentado en el [README principal](../README.md).
 
-Desde `app/backend`:
+Desde `app/BACKEND_TECH`:
 
 ```powershell
 docker compose -f docker-compose.parkflow.yml up -d
