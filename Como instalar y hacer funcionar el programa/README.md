@@ -22,15 +22,17 @@ Si `docker info` no muestra una sección `Server`, abre Docker Desktop y espera 
 
 ## 2. Descargar el proyecto desde Git
 
-En GitHub, abre el repositorio de ParkFlow, pulsa **Code → HTTPS** y copia la dirección. En PowerShell, cambia la URL de ejemplo por esa dirección:
+ParkFlow está dividido en dos repositorios: backend (`BACKEND_TECH`) y frontend (`FRONT_TECH`). Clónalos como carpetas hermanas para que Docker encuentre el frontend:
 
 ```powershell
-cd $HOME\Documents
-git clone https://github.com/USUARIO/REPOSITORIO.git PARKFLOW-SYSTEM
-cd .\PARKFLOW-SYSTEM\app\backend
+$projectRoot = Join-Path $HOME 'Documents\ParkFlow\app'
+New-Item -ItemType Directory -Path $projectRoot -Force | Out-Null
+git clone https://github.com/whitesans312/BACKEND_TECH.git (Join-Path $projectRoot 'backend')
+git clone https://github.com/whitesans312/FRONT_TECH.git (Join-Path $projectRoot 'FRONT_TECH')
+Set-Location (Join-Path $projectRoot 'backend')
 ```
 
-Si el repositorio es privado, GitHub solicitará iniciar sesión o usar un token. Otra opción es descargar el ZIP desde **Code → Download ZIP**, extraerlo y abrir la carpeta `app\backend`.
+Si GitHub solicita autenticación, el usuario debe tener acceso a los repositorios. También se pueden descargar ambos como ZIP, pero deben extraerse como carpetas `backend` y `FRONT_TECH` dentro del mismo directorio `app`.
 
 Confirma que estás en la carpeta correcta:
 
@@ -129,6 +131,8 @@ docker compose --env-file .env.parkflow -f .\docker-compose.parkflow.yml up -d
 ```
 
 No uses `docker compose down -v` si quieres conservar los datos: la opción `-v` elimina el volumen de PostgreSQL.
+
+El proyecto incluye dos archivos Compose (`docker-compose.parkflow.yml` y `docker-compose.yml`) para configuraciones locales distintas. Usa solo uno a la vez: comparten nombres de contenedores y podrían intentar crear bases separadas. No ejecutes `make clean` para detener el programa; ese objetivo elimina el volumen y los datos locales.
 
 ## 8. Solución de problemas comunes
 

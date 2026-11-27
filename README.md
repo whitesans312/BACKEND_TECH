@@ -97,7 +97,7 @@ Set-Location ../parking-service; .\mvnw.cmd -f ..\billing-service\pom.xml test
 Para construir el frontend, abre una terminal desde `app/backend`:
 
 ```powershell
-Set-Location ..\frontend
+Set-Location ..\FRONT_TECH
 npm ci
 npm run dev
 ```
@@ -121,7 +121,7 @@ Las salidas excepcionales, transferencias, mantenimiento, anulaciones, tiquete p
 - `parkflow-db-definitivo/{parking,identity,billing}`: migraciones Flyway activas.
 - `parkflow-db-definitivo/docs`: arquitectura, datos, reglas, contratos y pendientes.
 - `docker-compose.parkflow.yml`: entorno local completo.
-- `../frontend`: aplicación React.
+- `../FRONT_TECH`: aplicación React (carpeta del repositorio frontend).
 - [Estado de implementación, validaciones y límites](PARKFLOW_IMPLEMENTATION_ROADMAP.md).
 - [Guía paso a paso para instalar y ejecutar ParkFlow en otro computador](Como%20instalar%20y%20hacer%20funcionar%20el%20programa/README.md).
 
