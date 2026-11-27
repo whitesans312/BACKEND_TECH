@@ -34,6 +34,16 @@ public class SesionParqueo {
         this.liquidacionId=liquidacionId; this.operacionCierreId=operacionId; this.operadorCierreId=operadorId;
         this.fechaSalida=salida; this.tipoCierre=tipo; this.estado=EstadoSesion.CERRADA;
     }
+    /** Anula una sesión activa. La fila en anulaciones_sesion debe existir en la misma transacción. */
+    public void anular() {
+        if (estado != EstadoSesion.ACTIVA) throw new IllegalStateException("Solo se puede anular una sesión activa.");
+        this.estado = EstadoSesion.ANULADA;
+    }
+    /** Mueve el vehículo a otro espacio. El servicio valida tipo, disponibilidad y bloqueos antes de llamarlo. */
+    public void trasladarA(Espacio destino) {
+        if (estado != EstadoSesion.ACTIVA) throw new IllegalStateException("Solo se puede trasladar una sesión activa.");
+        this.espacio = destino;
+    }
     public void corregirPlaca(String placa) {
         if (estado != EstadoSesion.ACTIVA) throw new IllegalStateException("Solo se puede corregir la placa de una sesión activa.");
         this.placaActual=placa;

@@ -21,6 +21,9 @@ public class Espacio {
     @PreUpdate void onUpdate() { updatedAt=Instant.now(); }
     public void updateDetails(Zona zona,String codigo,TipoEspacio tipo) { this.zona=zona; this.codigo=codigo; this.tipo=tipo; }
     public void setHabilitado(boolean enabled) { estado=enabled?EstadoEspacio.HABILITADO:EstadoEspacio.DESHABILITADO; }
+    public void iniciarMantenimiento() { estado=EstadoEspacio.MANTENIMIENTO; }
+    public void terminarMantenimiento() { estado=EstadoEspacio.HABILITADO; }
+    public boolean isEnMantenimiento(){return estado==EstadoEspacio.MANTENIMIENTO;}
     public UUID getId(){return id;} public Zona getZona(){return zona;} public TipoEspacio getTipo(){return tipo;}
     public String getCodigo(){return codigo;} public boolean isHabilitado(){return estado==EstadoEspacio.HABILITADO;}
 }

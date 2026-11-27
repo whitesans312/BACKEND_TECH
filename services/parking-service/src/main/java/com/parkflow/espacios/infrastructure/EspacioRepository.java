@@ -31,6 +31,7 @@ public interface EspacioRepository extends JpaRepository<Espacio, UUID> {
                    e.codigo AS "codigo",
                    e.tipo_vehiculo AS "tipo",
                    (e.estado = 'HABILITADO') AS "habilitado",
+                   (e.estado = 'MANTENIMIENTO') AS "enMantenimiento",
                    (p.activo AND z.activa) AS "pisoHabilitado",
                    EXISTS (SELECT 1 FROM sesiones_parqueo s
                            WHERE s.espacio_id = e.id AND s.estado = 'ACTIVA') AS "ocupado",
@@ -55,6 +56,7 @@ public interface EspacioRepository extends JpaRepository<Espacio, UUID> {
                    e.codigo AS "codigo",
                    e.tipo_vehiculo AS "tipo",
                    (e.estado = 'HABILITADO') AS "habilitado",
+                   (e.estado = 'MANTENIMIENTO') AS "enMantenimiento",
                    (p.activo AND z.activa) AS "pisoHabilitado",
                    EXISTS (SELECT 1 FROM sesiones_parqueo s
                            WHERE s.espacio_id = e.id AND s.estado = 'ACTIVA') AS "ocupado",

@@ -36,6 +36,7 @@ public class ParkflowSecurityConfiguration {
                 .requestMatchers(HttpMethod.GET,"/api/v1/health","/actuator/health","/actuator/health/**").permitAll()
                 .requestMatchers("/api/v1/parqueadero/configuracion/**").hasRole("ADMINISTRADOR")
                 .requestMatchers(HttpMethod.GET,"/api/v1/pisos/**","/api/v1/espacios/**","/api/zonas/**","/api/sesiones/**","/api/v1/reservas/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
+                .requestMatchers(HttpMethod.POST,"/api/sesiones/*/anular").hasRole("ADMINISTRADOR")
                 .requestMatchers("/api/v1/pisos/**","/api/v1/espacios/**","/api/zonas/**").hasRole("ADMINISTRADOR")
                 .requestMatchers("/api/sesiones/**","/api/v1/reservas/**").hasAnyRole("ADMINISTRADOR","OPERADOR")
                 .anyRequest().authenticated())

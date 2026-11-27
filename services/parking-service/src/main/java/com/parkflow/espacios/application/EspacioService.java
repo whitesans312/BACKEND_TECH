@@ -73,6 +73,9 @@ public class EspacioService {
     public EspacioResponse setEnabled(UUID id, boolean enabled) {
         Espacio espacio = espacioRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("No existe el espacio solicitado."));
+        if (espacio.isEnMantenimiento()) {
+            throw new ConflictException("El espacio está en mantenimiento; finalice o cancele el mantenimiento primero.");
+        }
         if (!enabled && espacioRepository.existsActiveSession(id)) {
             throw new ConflictException("No se puede deshabilitar el espacio: tiene una sesión activa.");
         }

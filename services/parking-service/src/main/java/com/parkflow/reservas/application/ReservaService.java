@@ -83,6 +83,9 @@ public class ReservaService {
         if (espacio.getTipo() != request.tipoVehiculo()) {
             throw new ConflictException("El tipo de vehículo no es compatible con el espacio.");
         }
+        if (espacio.isEnMantenimiento()) {
+            throw new ConflictException("El espacio está en mantenimiento.");
+        }
         if (!espacio.isHabilitado() || !espacio.getZona().isActiva() || !espacio.getZona().getPiso().isHabilitado()) {
             throw new ConflictException("El espacio, la zona o el piso no están habilitados.");
         }
@@ -164,6 +167,9 @@ public class ReservaService {
 
         Espacio espacio = espacios.findByIdForUpdate(reserva.getEspacio().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("No existe el espacio reservado."));
+        if (espacio.isEnMantenimiento()) {
+            throw new ConflictException("El espacio está en mantenimiento.");
+        }
         if (!espacio.isHabilitado() || !espacio.getZona().isActiva() || !espacio.getZona().getPiso().isHabilitado()) {
             throw new ConflictException("El espacio, la zona o el piso no están habilitados.");
         }

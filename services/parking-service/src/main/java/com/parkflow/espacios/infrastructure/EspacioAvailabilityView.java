@@ -15,6 +15,7 @@ public interface EspacioAvailabilityView {
     boolean getPisoHabilitado();
     boolean getOcupado();
     boolean getReservado();
+    boolean getEnMantenimiento();
     Instant getCreatedAt();
     Instant getUpdatedAt();
 }
